@@ -16,7 +16,14 @@ phases:
       - set -e
       - echo "Looking for images.json among input artifacts..."
       - IMAGE_JSON=""
-      - for d in "$CODEBUILD_SRC_DIR" ${CODEBUILD_SRC_DIR_*}; do if [ -n "$d" ] && [ -f "$d/images.json" ]; then IMAGE_JSON="$d/images.json"; break; fi; done; if [ -z "$IMAGE_JSON" ]; then echo "images.json not found in any input artifact"; env | sort | grep CODEBUILD_SRC_DIR || true; exit 1; fi
+      - if [ -f "$CODEBUILD_SRC_DIR/images.json" ]; then IMAGE_JSON="$CODEBUILD_SRC_DIR/images.json"; fi
+      - if [ -z "$IMAGE_JSON" ]; then
+          env | sort | while IFS='=' read -r NAME VAL; do
+            case "$NAME" in CODEBUILD_SRC_DIR_*) if [ -f "$VAL/images.json" ]; then echo "$VAL/images.json"; break; fi;; esac;
+          done > /tmp/image_json_path;
+          if [ -s /tmp/image_json_path ]; then IMAGE_JSON=$(cat /tmp/image_json_path); fi;
+        fi
+      - if [ -z "$IMAGE_JSON" ]; then echo "images.json not found in any input artifact"; env | sort | grep CODEBUILD_SRC_DIR || true; exit 1; fi
       - echo "Using images.json at $IMAGE_JSON"
       - IMAGE_TAGS=$(cat "$IMAGE_JSON")
       - ELC_TAG=$(echo $IMAGE_TAGS | jq -r '.extract_legal_claims')
