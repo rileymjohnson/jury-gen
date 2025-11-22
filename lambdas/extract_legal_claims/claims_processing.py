@@ -97,7 +97,7 @@ def match_claims_to_database(claims: list[dict]) -> list[dict]:
                                 "description": "Index of the extracted claim (1-based)"
                             },
                             "claim_id": {
-                                "type": ["integer", "null"],
+                                "type": "string",
                                 "description": "Database claim ID, or null if invalid/no match"
                             },
                             "reasoning": {
