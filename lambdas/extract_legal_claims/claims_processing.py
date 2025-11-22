@@ -56,6 +56,7 @@ def _normalize_raw_claims(claims: list) -> list[dict]:
     return normalized
 
 def match_claims_to_database(claims: list[dict]) -> list[dict]:
+    print('ONE', claims)
     """Match extracted claims to database claims using LLM.
     
     Args:
@@ -71,14 +72,15 @@ def match_claims_to_database(claims: list[dict]) -> list[dict]:
         (f" - {claim.description[:100]}..." if claim.description else "")
         for claim in database_claims
     ])
-    
+    print('TWO')
     # Normalize and format extracted claims
     claims = _normalize_grouped_claims(claims)
+    print('THREE')
     extracted_claims_text = "\n".join([
         f"Claim {i+1}: {c['name']}\n  Raw texts: {', '.join(c.get('raw_texts', []))}"
         for i, c in enumerate(claims)
     ])
-    
+    print('FOUR')
     tools = [{
         "name": "match_claims",
         "description": "Match extracted claims to database claim IDs",
@@ -110,7 +112,7 @@ def match_claims_to_database(claims: list[dict]) -> list[dict]:
             "required": ["matches"]
         }
     }]
-    
+    print('FIVE')
     body = json.dumps({
         'anthropic_version': 'bedrock-2023-05-31',
         'max_tokens': 4000,
@@ -141,27 +143,27 @@ Guidelines:
 Return matches for ALL {len(claims)} extracted claims."""
         }]
     })
-    
+    print('SIX')
     response = bedrock.invoke_model(
         body=body,
         modelId='us.anthropic.claude-3-5-sonnet-20241022-v2:0',
         accept='application/json',
         contentType='application/json'
     )
-    
+    print('SEVEN')
     response_body = json.loads(response.get('body').read())
-    
+    print('EIGHT')
     # Extract tool use result
     matches = None
     for item in response_body.get('content', []):
         if item.get('type') == 'tool_use':
             matches = item['input']['matches']
             break
-    
+    print('NINE')
     if not matches:
         # Fallback: no matches
         return [{'claim_id': None, 'raw_texts': c.get('raw_texts', [])} for c in claims]
-    
+    print('TEN')
     # Build result maintaining order
     result = []
     match_dict = {m['claim_index']: m['claim_id'] for m in matches}
@@ -172,7 +174,7 @@ Return matches for ALL {len(claims)} extracted claims."""
             'claim_id': match_dict.get(claim_index),
             'raw_texts': claim.get('raw_texts', [])
         })
-    
+    print('ELEVEN')
     return result
 
 def deduplicate_claims(claims: list[dict]) -> list[dict]:
@@ -422,15 +424,12 @@ def extract_claims(chunks: list[str], window_size: int = 3) -> list[dict]:
         List of {'claim_id': int|None, 'raw_texts': list[str]} dicts
     """
     # Extract plaintiff's claims with sliding window
-    print('RAW')
     raw_claims = extract_raw_claims(chunks, window_size, claim_type="claims")
     
     # Deduplicate
-    print('DEDUPLICATE')
     deduplicated = deduplicate_claims(raw_claims)
     
     # Match to database
-    print('MATCH')
     matched = match_claims_to_database(deduplicated)
     
     return matched
@@ -443,15 +442,12 @@ def extract_counterclaims(chunks: list[str], window_size: int = 3) -> list[dict]
         List of {'claim_id': int|None, 'raw_texts': list[str]} dicts
     """
     # Extract defendant's counterclaims with sliding window
-    print('RAW')
     raw_counterclaims = extract_raw_claims(chunks, window_size, claim_type="counterclaims")
     
     # Deduplicate
-    print('DEDUPLICATE')
     deduplicated = deduplicate_claims(raw_counterclaims)
     
     # Match to database
-    print('MATCH')
     matched = match_claims_to_database(deduplicated)
     
     return matched
