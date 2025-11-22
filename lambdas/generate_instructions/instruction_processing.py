@@ -1,0 +1,445 @@
+from supabase import create_client
+import boto3
+
+from types import SimpleNamespace
+import json
+
+bedrock = boto3.client('bedrock-runtime')
+
+SUPABASE_URL = 'https://qeuthcemoefancllsckc.supabase.co'
+SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFldXRoY2Vtb2VmYW5jbGxzY2tjIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc2MjUwOTM0MiwiZXhwIjoyMDc4MDg1MzQyfQ.LItXDQxd2Cjrkge3l95WA9zxOg12vcnOOhpvHYLum1M'
+
+supabase = create_client(
+    SUPABASE_URL,
+    SUPABASE_KEY
+)
+
+database_claims = supabase.table('claims').select('*').execute().data
+database_claims = [SimpleNamespace(**c) for c in database_claims]
+
+def database_get_claim_by_id(claim_id):
+    matches = [c for c in database_claims if c.id == claim_id]
+
+    return matches[0] if len(matches) > 0 else None
+
+def match_claim_to_category(claim_title, case_facts, standard_categories):
+    """
+    Match a claim to a standard jury instruction category or determine if custom needed
+    
+    Args:
+        claim_title: Title of the claim (e.g., "Breach of Contract")
+        case_facts: 2-3 paragraph case facts summary
+        standard_categories: List of tuples [(category_number, category_title), ...]
+        
+    Returns:
+        str: Category number (e.g., "416") or "CUSTOM"
+    """
+    
+    # Format categories for the prompt
+    categories_list = "\n".join([
+        f"{num}: {title}" for num, title in standard_categories
+    ])
+    
+    tools = [{
+        "name": "match_category",
+        "description": "Match claim to instruction category or indicate custom needed",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "category": {
+                    "type": "string",
+                    "description": "The category number (e.g., '416') or 'CUSTOM' if no match"
+                },
+                "reasoning": {
+                    "type": "string",
+                    "description": "Brief explanation of why this category matches or why custom is needed"
+                }
+            },
+            "required": ["category", "reasoning"]
+        }
+    }]
+    
+    prompt = f"""Match this claim to the appropriate standard jury instruction category.
+
+CLAIM: {claim_title}
+
+CASE FACTS:
+{case_facts}
+
+AVAILABLE INSTRUCTION CATEGORIES:
+{categories_list}
+
+Determine which category this claim belongs to. If the claim clearly matches one of the standard categories, return that category number. If there is no good match (e.g., claims like "Conversion", "Libel", "Slander", "Defamation" that aren't listed), return "CUSTOM".
+
+Consider:
+- The claim title itself
+- The nature of the claim based on case facts
+- Whether it's a tort vs. contract claim
+- Whether it fits clearly within a standard category"""
+
+    body = json.dumps({
+        'anthropic_version': 'bedrock-2023-05-31',
+        'max_tokens': 500,
+        'tools': tools,
+        'tool_choice': {"type": "tool", "name": "match_category"},
+        'messages': [{'role': 'user', 'content': prompt}]
+    })
+    
+    response = bedrock.invoke_model(
+        body=body,
+        modelId='us.anthropic.claude-3-5-sonnet-20241022-v2:0',
+        accept='application/json',
+        contentType='application/json'
+    )
+    
+    response_body = json.loads(response.get('body').read())
+    
+    # Extract tool use result
+    for item in response_body.get('content', []):
+        if item.get('type') == 'tool_use':
+            result = item['input']
+            print(f"Claim '{claim_title}' matched to: {result['category']}")
+            print(f"Reasoning: {result['reasoning']}")
+            return result['category']
+    
+    # Fallback
+    return "CUSTOM"
+
+def llm_select_instructions(claim_title, claim_elements, defenses, case_facts, available_instructions):
+    """
+    LLM selects which instructions to include and returns customized versions
+    """
+    
+    instructions_list = json.dumps(available_instructions, indent=2)
+    defenses_list = "\n".join([f"- {d['name']}: {d['raw_text']}" for d in defenses])
+    elements_list = "\n".join([f"- {elem}" for elem in claim_elements])
+    
+    tools = [{
+        "name": "select_instructions",
+        "description": "Select which jury instructions apply and customize them",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "selected_instructions": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "number": {
+                                "type": "string",
+                                "description": "Instruction number (e.g., '416.5')"
+                            },
+                            "include": {
+                                "type": "boolean",
+                                "description": "Whether to include this instruction"
+                            },
+                            "reasoning": {
+                                "type": "string",
+                                "description": "Why this instruction should or should not be included"
+                            },
+                            "customized_text": {
+                                "type": "string",
+                                "description": "The fully customized instruction text with bracketed choices resolved and party names filled in. Only provide if include=true."
+                            }
+                        },
+                        "required": ["number", "include", "reasoning"]
+                    }
+                }
+            },
+            "required": ["selected_instructions"]
+        }
+    }]
+    
+    prompt = f"""You are selecting and customizing jury instructions for a specific claim.
+
+CLAIM: {claim_title}
+
+CLAIM ELEMENTS (what must be proven):
+{elements_list}
+
+DEFENSES RAISED:
+{defenses_list}
+
+CASE FACTS:
+{case_facts}
+
+AVAILABLE INSTRUCTIONS:
+{instructions_list}
+
+For EACH instruction, determine:
+1. Should it be included? Consider:
+   - Is this element/issue contested in the case?
+   - Do the defenses raise this issue?
+   - Does it apply to the facts?
+   - Do the notes_on_use say when to include/exclude?
+
+2. If included, provide the CUSTOMIZED text:
+   - Choose appropriate bracketed alternatives
+   - Fill in party names from case facts
+   - Fill in any other blanks (amounts, dates, etc.)
+   - Remove unused bracketed options
+   
+Example for 416.5:
+- Original: "[Contracts may be written or oral.] [Contracts may be partly written and partly oral.] Oral contracts are just as valid as written contracts."
+- If oral contract: "Contracts may be written or oral. Oral contracts are just as valid as written contracts."
+- If mixed: "Contracts may be partly written and partly oral. Oral contracts are just as valid as written contracts."
+- If fully written: Don't include this instruction at all
+
+Be thorough but conservative - only include instructions that are truly relevant."""
+
+    body = json.dumps({
+        'anthropic_version': 'bedrock-2023-05-31',
+        'max_tokens': 4000,
+        'tools': tools,
+        'tool_choice': {"type": "tool", "name": "select_instructions"},
+        'messages': [{'role': 'user', 'content': prompt}]
+    })
+    
+    response = bedrock.invoke_model(
+        body=body,
+        modelId='us.anthropic.claude-3-5-sonnet-20241022-v2:0',
+        accept='application/json',
+        contentType='application/json'
+    )
+    
+    response_body = json.loads(response.get('body').read())
+    
+    # Extract tool use result
+    for item in response_body.get('content', []):
+        if item.get('type') == 'tool_use':
+            all_instructions = item['input']['selected_instructions']
+            # Filter to only included ones
+            selected = [
+                inst for inst in all_instructions 
+                if inst['include']
+            ]
+            return selected
+    
+    return []
+
+def select_and_customize_instructions(category_number, claim, claim_elements, defenses, case_facts):
+    """
+    Select which sub-instructions from a category apply and customize them
+    
+    Args:
+        category_number: e.g., "416"
+        claim: Claim object from litigation guide
+        claim_elements: List of elements for this claim type
+        defenses: List of defense dicts with 'name' and 'raw_text'
+        case_facts: Case facts summary
+        
+    Returns:
+        List of dicts with instruction details and customization args
+    """
+    
+    # Get all sub-instructions in this category
+    sub_instructions = [SimpleNamespace(**r) for r in supabase.table('standard_jury_instructions') \
+        .select('*') \
+        .eq('category_number', category_number) \
+        .order('number', desc=False) \
+        .execute() \
+        .data]
+    
+    # Format for LLM
+    instructions_summary = []
+    for inst in sub_instructions:
+        instructions_summary.append({
+            "number": inst.number,
+            "title": inst.title,
+            "main_paragraph": inst.main_paragraph,
+            "notes_on_use": inst.notes_on_use or []
+        })
+    
+    # Ask LLM to select which ones apply
+    selected = llm_select_instructions(
+        claim_title=claim.title,
+        claim_elements=claim_elements,
+        defenses=defenses,
+        case_facts=case_facts,
+        available_instructions=instructions_summary
+    )
+    
+    return selected
+
+def generate_custom_instructions(claim_info, claim, case_facts):
+    """
+    Generate custom jury instructions for claims without standard instructions
+    
+    Args:
+        claim_info: Dict with claim data (raw_texts, damages, defenses)
+        claim: Claim object from litigation guide (with elements, description)
+        case_facts: Case facts summary
+        
+    Returns:
+        List of instruction dicts with customized_text and reasoning
+    """
+    
+    defenses_list = "\n".join([
+        f"- {d['name']}: {d['raw_text']}" 
+        for d in claim_info.get('defenses', [])
+    ])
+    
+    elements_list = "\n".join([f"- {elem}" for elem in claim.elements])
+    
+    tools = [{
+        "name": "generate_custom_instructions",
+        "description": "Generate custom jury instructions for a claim without standard instructions",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "instructions": {
+                    "type": "array",
+                    "description": "List of custom instructions for this claim",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "customized_text": {
+                                "type": "string",
+                                "description": "The full text of this instruction with party names and facts filled in"
+                            },
+                            "reasoning": {
+                                "type": "string",
+                                "description": "Brief explanation of what this instruction covers"
+                            }
+                        },
+                        "required": ["customized_text", "reasoning"]
+                    }
+                }
+            },
+            "required": ["instructions"]
+        }
+    }]
+    
+    prompt = f"""Generate custom jury instructions for a claim that has no standard Florida instruction.
+
+CLAIM: {claim.title}
+
+CLAIM ELEMENTS (from Florida Litigation Guide):
+{elements_list}
+
+CLAIM DESCRIPTION:
+{claim.description or 'No description available'}
+
+DEFENSES RAISED:
+{defenses_list}
+
+CASE FACTS:
+{case_facts}
+
+Generate a complete set of jury instructions for this claim, following the style and structure of Florida Standard Jury Instructions. You should generate multiple separate instructions covering:
+
+1. Introduction to the claim - Brief statement of what claimant alleges
+2. Essential elements - What claimant must prove (numbered list based on claim elements above)
+3. Any key definitions needed
+4. Issues the jury must decide
+5. Burden of proof - what happens if claim not proven
+6. Defense instructions - for each defense raised
+7. Burden if claim proven - what jury should do next
+
+Use neutral, clear language. Fill in actual party names from case facts. Model after standard instructions in the 401.x and 416.x series.
+
+Example formats:
+- Introduction: "(Claimant) claims that (defendant) committed [tort/wrong] by [describe actions]..."
+- Elements: "To prove [claim], (claimant) must prove all of the following: 1. [element]; 2. [element]; 3. [element]..."
+- Issues: "The issues you must decide on (claimant)'s claim against (defendant) are whether [list issues]..."
+- Burden: "If the greater weight of the evidence does not support (claimant)'s claim, your verdict should be for (defendant)."
+
+Each instruction should be a separate item in the array."""
+
+    body = json.dumps({
+        'anthropic_version': 'bedrock-2023-05-31',
+        'max_tokens': 4000,
+        'tools': tools,
+        'tool_choice': {"type": "tool", "name": "generate_custom_instructions"},
+        'messages': [{'role': 'user', 'content': prompt}]
+    })
+    
+    response = bedrock.invoke_model(
+        body=body,
+        modelId='us.anthropic.claude-3-5-sonnet-20241022-v2:0',
+        accept='application/json',
+        contentType='application/json'
+    )
+    
+    response_body = json.loads(response.get('body').read())
+    
+    # Extract tool use result
+    for item in response_body.get('content', []):
+        if item.get('type') == 'tool_use':
+            instructions = item['input']['instructions']
+            # Add number field for consistency with standard instructions
+            for i, inst in enumerate(instructions, 1):
+                inst['number'] = f"CUSTOM-{claim.title.upper().replace(' ', '-')}-{i}"
+            return instructions
+    
+    return []
+
+def generate_instructions(claims, counterclaims, case_facts):
+    all_400_instructions = []
+
+    custom_claims = []
+    custom_counterclaims = []
+    
+    standard_instruction_categories = sorted({(r['category_number'], r['category_title']) for r in supabase.table('standard_jury_instructions').select('category_number, category_title').execute().data})
+    
+    for claim_info in claims:
+        claim = database_get_claim_by_id(claim_info['claim_id'])
+
+        if claim is None:
+            continue
+
+        category = match_claim_to_category(
+            claim_title=claim.title,
+            case_facts=case_facts,
+            standard_categories=standard_instruction_categories
+        )
+
+        if category != "CUSTOM":
+            selected_instructions = select_and_customize_instructions(
+                category_number=category,
+                claim=claim,
+                claim_elements=claim.elements,
+                defenses=claim_info.get('defenses', []),
+                case_facts=case_facts
+            )
+            all_400_instructions.extend(selected_instructions)
+        else:
+            custom_claims.append(claim_info)
+
+    for counterclaim_info in counterclaims:
+        claim = database_get_claim_by_id(counterclaim_info['claim_id'])
+
+        if claim is None:
+            continue
+
+        category = match_claim_to_category(
+            claim_title=claim.title,
+            case_facts=case_facts,
+            standard_categories=standard_instruction_categories
+        )
+
+        if category != "CUSTOM":
+            selected_instructions = select_and_customize_instructions(
+                category_number=category,
+                claim=claim,
+                claim_elements=claim.elements,
+                defenses=[],  # Counterclaims don't have defenses from plaintiff
+                case_facts=case_facts
+            )
+            all_400_instructions.extend(selected_instructions)
+        else:
+            custom_counterclaims.append(counterclaim_info)
+
+    all_custom_claims = custom_claims + custom_counterclaims
+    
+    for claim_info in all_custom_claims:
+        claim = database_get_claim_by_id(claim_info['claim_id'])
+        
+        custom_instructions = generate_custom_instructions(
+            claim_info=claim_info,
+            claim=claim,
+            case_facts=case_facts
+        )
+        all_400_instructions.extend(custom_instructions)
+
+    return all_400_instructions

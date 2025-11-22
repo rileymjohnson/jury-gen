@@ -1,0 +1,10 @@
+{
+  "files": {
+    "complaint": {
+      "SourceS3Path": "s3://jury-app-uploads-196861676652/complaint.pdf"
+    },
+    "answer": {
+      "SourceS3Path":"s3://jury-app-uploads-196861676652/answer.pdf"
+    }
+  }
+}

@@ -1,0 +1,299 @@
+resource "aws_sfn_state_machine" "jury_app_workflow" {
+  name     = "JuryAppWorkflow"
+  role_arn = aws_iam_role.sfn_execution_role.arn
+
+  definition = <<-EOF
+  {
+    "Comment": "Orchestrates the entire jury instruction generation process.",
+    "StartAt": "StartJob",
+    "States": {
+      "StartJob": {
+        "Type": "Task",
+        "Resource": "${aws_lambda_function.job_start.arn}",
+        "ResultPath": "$.job_data",
+        "Next": "ProcessDocuments"
+      },
+
+      "ProcessDocuments": {
+        "Type": "Parallel",
+        "Next": "AssembleData",
+        "Catch": [
+          {
+            "ErrorEquals": ["States.ALL"],
+            "ResultPath": "$.error",
+            "Next": "JobFailed"
+          }
+        ],
+        "ResultPath": "$.documents",
+        "Branches": [
+          {
+            "StartAt": "StartComplaintTextract",
+            "States": {
+              "StartComplaintTextract": {
+                "Type": "Task",
+                "Resource": "${aws_lambda_function.textract_start.arn}",
+                "InputPath": "$.job_data.files.complaint",
+                "ResultPath": "$.complaint_textract",
+                "Next": "WaitComplaint"
+              },
+              "WaitComplaint": {
+                "Type": "Wait",
+                "Seconds": 30,
+                "Next": "CheckComplaintStatus"
+              },
+              "CheckComplaintStatus": {
+                "Type": "Task",
+                "Resource": "${aws_lambda_function.textract_check_status.arn}",
+                "InputPath": "$.complaint_textract",
+                "ResultPath": "$.complaint_textract.status",
+                "Next": "IsComplaintReady"
+              },
+              "IsComplaintReady": {
+                "Type": "Choice",
+                "Choices": [
+                  {
+                    "Variable": "$.complaint_textract.status.Status",
+                    "StringEquals": "SUCCEEDED",
+                    "Next": "GetComplaintResults"
+                  },
+                  {
+                    "Variable": "$.complaint_textract.status.Status",
+                    "StringEquals": "FAILED",
+                    "Next": "ComplaintBranchFail"
+                  }
+                ],
+                "Default": "WaitComplaint"
+              },
+              "GetComplaintResults": {
+                "Type": "Task",
+                "Resource": "${aws_lambda_function.textract_get_results.arn}",
+                "InputPath": "$.complaint_textract",
+                "ResultPath": "$.complaint_chunks",
+                "End": true
+              },
+              "ComplaintBranchFail": {
+                "Type": "Fail",
+                "Error": "ComplaintTextractFailed",
+                "Cause": "Textract reported FAILED for complaint"
+              }
+            }
+          },
+          {
+            "StartAt": "StartAnswerTextract",
+            "States": {
+              "StartAnswerTextract": {
+                "Type": "Task",
+                "Resource": "${aws_lambda_function.textract_start.arn}",
+                "InputPath": "$.job_data.files.answer",
+                "ResultPath": "$.answer_textract",
+                "Next": "WaitAnswer"
+              },
+              "WaitAnswer": {
+                "Type": "Wait",
+                "Seconds": 30,
+                "Next": "CheckAnswerStatus"
+              },
+              "CheckAnswerStatus": {
+                "Type": "Task",
+                "Resource": "${aws_lambda_function.textract_check_status.arn}",
+                "InputPath": "$.answer_textract",
+                "ResultPath": "$.answer_textract.status",
+                "Next": "IsAnswerReady"
+              },
+              "IsAnswerReady": {
+                "Type": "Choice",
+                "Choices": [
+                  {
+                    "Variable": "$.answer_textract.status.Status",
+                    "StringEquals": "SUCCEEDED",
+                    "Next": "GetAnswerResults"
+                  },
+                  {
+                    "Variable": "$.answer_textract.status.Status",
+                    "StringEquals": "FAILED",
+                    "Next": "AnswerBranchFail"
+                  }
+                ],
+                "Default": "WaitAnswer"
+              },
+              "GetAnswerResults": {
+                "Type": "Task",
+                "Resource": "${aws_lambda_function.textract_get_results.arn}",
+                "InputPath": "$.answer_textract",
+                "ResultPath": "$.answer_chunks",
+                "End": true
+              },
+              "AnswerBranchFail": {
+                "Type": "Fail",
+                "Error": "AnswerTextractFailed",
+                "Cause": "Textract reported FAILED for answer"
+              }
+            }
+          }
+        ]
+      },
+
+      "AssembleData": {
+        "Type": "Pass",
+        "Parameters": {
+          "jury_instruction_id.$": "$.job_data.jury_instruction_id",
+          "complaint_chunks.$": "$.documents[0].complaint_chunks",
+          "answer_chunks.$": "$.documents[1].answer_chunks",
+          "job_data.$": "$.job_data"
+        },
+        "Next": "ExtractCoreData"
+      },
+
+      "ExtractCoreData": {
+        "Type": "Parallel",
+        "ResultPath": "$.core_results",
+        "Next": "AssembleCoreResults",
+        "Branches": [
+          {
+            "StartAt": "ExtractClaims",
+            "States": {
+              "ExtractClaims": {
+                "Type": "Task",
+                "Resource": "${aws_lambda_function.extract_legal_claims.arn}",
+                "Parameters": {
+                  "chunks.$": "$.complaint_chunks",
+                  "claim_type": "claims"
+                },
+                "ResultPath": "$.claims",
+                "End": true
+              }
+            }
+          },
+          {
+            "StartAt": "ExtractCounterclaims",
+            "States": {
+              "ExtractCounterclaims": {
+                "Type": "Task",
+                "Resource": "${aws_lambda_function.extract_legal_claims.arn}",
+                "Parameters": {
+                  "chunks.$": "$.answer_chunks",
+                  "claim_type": "counterclaims"
+                },
+                "ResultPath": "$.counterclaims",
+                "End": true
+              }
+            }
+          },
+          {
+            "StartAt": "ExtractWitnesses",
+            "States": {
+              "ExtractWitnesses": {
+                "Type": "Task",
+                "Resource": "${aws_lambda_function.extract_witnesses.arn}",
+                "InputPath": "$.complaint_chunks",
+                "ResultPath": "$.witnesses",
+                "End": true
+              }
+            }
+          },
+          {
+            "StartAt": "ExtractCaseFacts",
+            "States": {
+              "ExtractCaseFacts": {
+                "Type": "Task",
+                "Resource": "${aws_lambda_function.extract_case_facts.arn}",
+                "Parameters": {
+                  "complaint_chunks.$": "$.complaint_chunks",
+                  "answer_chunks.$": "$.answer_chunks"
+                },
+                "ResultPath": "$.case_facts",
+                "End": true
+              }
+            }
+          }
+        ]
+      },
+
+      "AssembleCoreResults": {
+        "Type": "Pass",
+        "Parameters": {
+          "jury_instruction_id.$": "$.jury_instruction_id",
+          "job_data.$": "$.job_data",
+          "complaint_chunks.$": "$.complaint_chunks",
+          "answer_chunks.$": "$.answer_chunks",
+          "claims.$": "$.core_results[0].claims",
+          "counterclaims.$": "$.core_results[1].counterclaims",
+          "witnesses.$": "$.core_results[2].witnesses",
+          "case_facts.$": "$.core_results[3].case_facts"
+        },
+        "Next": "EnrichClaims"
+      },
+
+      "EnrichClaims": {
+        "Type": "Map",
+        "InputPath": "$",
+        "ItemsPath": "$.claims",
+        "MaxConcurrency": 5,
+        "Parameters": {
+          "item.$": "$$.Map.Item.Value",
+          "complaint_chunks.$": "$.complaint_chunks",
+          "answer_chunks.$": "$.answer_chunks"
+        },
+        "Iterator": {
+          "StartAt": "EnrichClaimItem",
+          "States": {
+            "EnrichClaimItem": {
+              "Type": "Task",
+              "Resource": "${aws_lambda_function.enrich_legal_item.arn}",
+              "Parameters": {
+                "item.$": "$.item",
+                "type": "claim",
+                "complaint_chunks.$": "$.complaint_chunks",
+                "answer_chunks.$": "$.answer_chunks"
+              },
+              "End": true
+            }
+          }
+        },
+        "ResultPath": "$.claims",
+        "Next": "GenerateInstructions"
+      },
+
+      "GenerateInstructions": {
+        "Type": "Task",
+        "Resource": "${aws_lambda_function.generate_instructions.arn}",
+        "Parameters": {
+          "claims.$": "$.claims",
+          "counterclaims.$": "$.counterclaims",
+          "case_facts.$": "$.case_facts"
+        },
+        "ResultPath": "$.instructions",
+        "Next": "SaveResults"
+      },
+
+      "SaveResults": {
+        "Type": "Task",
+        "Resource": "${aws_lambda_function.job_save_results.arn}",
+        "End": true
+      },
+
+      "JobFailed": {
+        "Type": "Task",
+        "Resource": "${aws_lambda_function.job_handle_error.arn}",
+        "End": true
+      }
+    }
+  }
+  EOF
+
+  # This makes sure the state machine definition is updated
+  # if any Lambda ARNs change.
+  depends_on = [
+    aws_lambda_function.job_start,
+    aws_lambda_function.textract_start,
+    aws_lambda_function.textract_check_status,
+    aws_lambda_function.textract_get_results,
+    aws_lambda_function.extract_legal_claims,
+    aws_lambda_function.extract_witnesses,
+    aws_lambda_function.extract_case_facts,
+    aws_lambda_function.enrich_legal_item,
+    aws_lambda_function.generate_instructions,
+    aws_lambda_function.job_save_results,
+    aws_lambda_function.job_handle_error
+  ]
+}
