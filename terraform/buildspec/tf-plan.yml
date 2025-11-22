@@ -14,7 +14,7 @@ phases:
     commands:
       - echo Preparing Terraform plan...
       - cd terraform
-      - IMAGE_TAGS=$(cat ../images.json)
+      - IMAGE_TAGS=$(cat "$CODEBUILD_SRC_DIR_DOCKERARTIFACT/images.json")
       - ELC_TAG=$(echo $IMAGE_TAGS | jq -r '.extract_legal_claims')
       - GI_TAG=$(echo $IMAGE_TAGS | jq -r '.generate_instructions')
       - TGR_TAG=$(echo $IMAGE_TAGS | jq -r '.textract_get_results')
@@ -27,4 +27,3 @@ artifacts:
   files:
     - terraform/tfplan
     - images.json
-

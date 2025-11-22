@@ -221,7 +221,8 @@ resource "aws_codepipeline" "pipeline" {
       input_artifacts = ["SourceArtifact", "DockerArtifact"]
       output_artifacts = ["TfPlanArtifact"]
       configuration = {
-        ProjectName = aws_codebuild_project.tf_plan.name
+        ProjectName  = aws_codebuild_project.tf_plan.name
+        PrimarySource = "SourceArtifact"
       }
     }
   }
@@ -236,7 +237,8 @@ resource "aws_codepipeline" "pipeline" {
       version         = "1"
       input_artifacts = ["SourceArtifact", "TfPlanArtifact"]
       configuration = {
-        ProjectName = aws_codebuild_project.tf_apply.name
+        ProjectName  = aws_codebuild_project.tf_apply.name
+        PrimarySource = "SourceArtifact"
       }
     }
   }
