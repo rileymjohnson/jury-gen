@@ -3,6 +3,20 @@ resource "aws_s3_bucket" "uploads" {
   bucket = "jury-app-uploads-${data.aws_caller_identity.current.account_id}"
 }
 
+# CORS for browser uploads to presigned URLs
+resource "aws_s3_bucket_cors_configuration" "uploads_cors" {
+  bucket = aws_s3_bucket.uploads.id
+
+  cors_rule {
+    id              = "uploads-presigned"
+    allowed_methods = ["PUT", "GET", "HEAD"]
+    allowed_origins = ["*"]
+    allowed_headers = ["*"]
+    expose_headers  = ["ETag"]
+    max_age_seconds = 3000
+  }
+}
+
 # 1a. Block public access for the uploads bucket
 # This is its own resource, referencing the bucket above.
 resource "aws_s3_bucket_public_access_block" "uploads_public_access" {
