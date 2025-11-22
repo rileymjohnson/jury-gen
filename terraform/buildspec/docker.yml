@@ -7,8 +7,9 @@ phases:
     commands:
       - echo Logging in to Amazon ECR...
       - aws ecr get-login-password --region $AWS_DEFAULT_REGION | docker login --username AWS --password-stdin ${ACCOUNT_ID}.dkr.ecr.${AWS_DEFAULT_REGION}.amazonaws.com
-      - COMMIT_SHA=${CODEBUILD_RESOLVED_SOURCE_VERSION}
-      - SHORT_SHA=${COMMIT_SHA:0:7}
+      - COMMIT_SHA="$CODEBUILD_RESOLVED_SOURCE_VERSION"
+      - SHORT_SHA=$(echo "$COMMIT_SHA" | cut -c1-7)
+      - if [ -z "$SHORT_SHA" ] || [ "$SHORT_SHA" = "null" ]; then SHORT_SHA=$(date +%s); fi
       - echo Using tag $SHORT_SHA
   build:
     commands:
@@ -29,4 +30,3 @@ phases:
 artifacts:
   files:
     - images.json
-
