@@ -166,6 +166,8 @@ Return matches for ALL {len(claims)} extracted claims."""
     print('TEN')
     print('MATCHES', type(matches), matches)
     print('CLAIMS', type(claims), claims)
+    if isinstance(matches, str):
+        matches = json.loads(matches)
     # Build result maintaining order
     result = []
     match_dict = {m['claim_index']: m['claim_id'] for m in matches}
