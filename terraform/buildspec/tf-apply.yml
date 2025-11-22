@@ -29,12 +29,8 @@ phases:
       - ELC_TAG=$(echo $IMAGE_TAGS | jq -r '.extract_legal_claims')
       - GI_TAG=$(echo $IMAGE_TAGS | jq -r '.generate_instructions')
       - TGR_TAG=$(echo $IMAGE_TAGS | jq -r '.textract_get_results')
-      - cd terraform
-      - terraform init -input=false
-      - terraform apply -auto-approve -input=false \
-          -var="extract_legal_claims_tag=$ELC_TAG" \
-          -var="generate_instructions_tag=$GI_TAG" \
-          -var="textract_get_results_tag=$TGR_TAG"
+      - terraform -chdir=terraform init -input=false
+      - terraform -chdir=terraform apply -auto-approve -input=false -var="extract_legal_claims_tag=$ELC_TAG" -var="generate_instructions_tag=$GI_TAG" -var="textract_get_results_tag=$TGR_TAG"
 artifacts:
   files:
     - images.json

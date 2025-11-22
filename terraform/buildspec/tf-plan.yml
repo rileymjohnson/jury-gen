@@ -26,15 +26,11 @@ phases:
       - if [ -z "$IMAGE_JSON" ]; then echo "images.json not found in any input artifact"; env | sort | grep CODEBUILD_SRC_DIR || true; exit 1; fi
       - echo "Using images.json at $IMAGE_JSON"
       - IMAGE_TAGS=$(cat "$IMAGE_JSON")
-      - cd terraform
       - ELC_TAG=$(echo $IMAGE_TAGS | jq -r '.extract_legal_claims')
       - GI_TAG=$(echo $IMAGE_TAGS | jq -r '.generate_instructions')
       - TGR_TAG=$(echo $IMAGE_TAGS | jq -r '.textract_get_results')
-      - terraform init -input=false
-      - terraform plan -out=tfplan -input=false \
-          -var="extract_legal_claims_tag=$ELC_TAG" \
-          -var="generate_instructions_tag=$GI_TAG" \
-          -var="textract_get_results_tag=$TGR_TAG"
+      - terraform -chdir=terraform init -input=false
+      - terraform -chdir=terraform plan -out=tfplan -input=false -var="extract_legal_claims_tag=$ELC_TAG" -var="generate_instructions_tag=$GI_TAG" -var="textract_get_results_tag=$TGR_TAG"
 artifacts:
   files:
     - terraform/tfplan
