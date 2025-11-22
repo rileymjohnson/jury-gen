@@ -265,74 +265,7 @@ resource "aws_iam_role_policy_attachment" "job_save_results_logging" {
 
 # --- API Lambdas IAM ---
 
-resource "aws_iam_role" "api_signer" {
-  name               = "ApiSignerLambdaRole"
-  assume_role_policy = data.aws_iam_policy_document.lambda_assume_role.json
-
-  inline_policy {
-    name = "SignerS3PutPolicy"
-    policy = jsonencode({
-      Version = "2012-10-17",
-      Statement = [
-        {
-          Effect   = "Allow",
-          Action   = ["s3:PutObject"],
-          Resource = "${aws_s3_bucket.uploads.arn}/*"
-        }
-      ]
-    })
-  }
-}
-resource "aws_iam_role_policy_attachment" "api_signer_logging" {
-  role       = aws_iam_role.api_signer.name
-  policy_arn = aws_iam_policy.lambda_basic_logging.arn
-}
-
-resource "aws_iam_role" "api_start" {
-  name               = "ApiStartLambdaRole"
-  assume_role_policy = data.aws_iam_policy_document.lambda_assume_role.json
-
-  inline_policy {
-    name = "StartStepFunctionsPolicy"
-    policy = jsonencode({
-      Version = "2012-10-17",
-      Statement = [
-        {
-          Effect   = "Allow",
-          Action   = ["states:StartExecution"],
-          Resource = aws_sfn_state_machine.jury_app_workflow.arn
-        }
-      ]
-    })
-  }
-}
-resource "aws_iam_role_policy_attachment" "api_start_logging" {
-  role       = aws_iam_role.api_start.name
-  policy_arn = aws_iam_policy.lambda_basic_logging.arn
-}
-
-resource "aws_iam_role" "api_status" {
-  name               = "ApiStatusLambdaRole"
-  assume_role_policy = data.aws_iam_policy_document.lambda_assume_role.json
-
-  inline_policy {
-    name = "StatusDynamoReadPolicy"
-    policy = jsonencode({
-      Version = "2012-10-17",
-      Statement = [
-        {
-          Effect   = "Allow",
-          Action   = ["dynamodb:GetItem"],
-          Resource = aws_dynamodb_table.jury_instructions.arn
-        }
-      ]
-    })
-  }
-}
-resource "aws_iam_role_policy_attachment" "api_status_logging" {
-  role       = aws_iam_role.api_status.name
-  policy_arn = aws_iam_policy.lambda_basic_logging.arn
-}
+ 
 
 
 resource "aws_iam_role" "job_handle_error" {

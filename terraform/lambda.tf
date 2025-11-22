@@ -54,21 +54,7 @@ data "archive_file" "generate_instructions" {
 }
 
 # --- API Lambdas (zip)
-data "archive_file" "api_signer" {
-  type        = "zip"
-  source_dir  = abspath("${path.module}/../lambdas/api_signer/")
-  output_path = abspath("${path.module}/.build/api_signer.zip")
-}
-data "archive_file" "api_start" {
-  type        = "zip"
-  source_dir  = abspath("${path.module}/../lambdas/api_start/")
-  output_path = abspath("${path.module}/.build/api_start.zip")
-}
-data "archive_file" "api_status" {
-  type        = "zip"
-  source_dir  = abspath("${path.module}/../lambdas/api_status/")
-  output_path = abspath("${path.module}/.build/api_status.zip")
-}
+ 
 
 
 # --- Lambda Function Definitions ---
@@ -212,50 +198,4 @@ resource "aws_lambda_function" "job_handle_error" {
 }
 
 # --- API Lambda Functions ---
-resource "aws_lambda_function" "api_signer" {
-  function_name    = "JuryApp-ApiSigner"
-  handler          = "main.lambda_handler"
-  runtime          = "python3.12"
-  role             = aws_iam_role.api_signer.arn
-  filename         = data.archive_file.api_signer.output_path
-  source_code_hash = data.archive_file.api_signer.output_base64sha256
-  timeout          = 10
-
-  environment {
-    variables = {
-      UPLOADS_BUCKET = aws_s3_bucket.uploads.id
-    }
-  }
-}
-
-resource "aws_lambda_function" "api_start" {
-  function_name    = "JuryApp-ApiStart"
-  handler          = "main.lambda_handler"
-  runtime          = "python3.12"
-  role             = aws_iam_role.api_start.arn
-  filename         = data.archive_file.api_start.output_path
-  source_code_hash = data.archive_file.api_start.output_base64sha256
-  timeout          = 10
-
-  environment {
-    variables = {
-      STATE_MACHINE_ARN = aws_sfn_state_machine.jury_app_workflow.arn
-    }
-  }
-}
-
-resource "aws_lambda_function" "api_status" {
-  function_name    = "JuryApp-ApiStatus"
-  handler          = "main.lambda_handler"
-  runtime          = "python3.12"
-  role             = aws_iam_role.api_status.arn
-  filename         = data.archive_file.api_status.output_path
-  source_code_hash = data.archive_file.api_status.output_base64sha256
-  timeout          = 10
-
-  environment {
-    variables = {
-      DYNAMODB_TABLE_NAME = aws_dynamodb_table.jury_instructions.name
-    }
-  }
-}
+ 
