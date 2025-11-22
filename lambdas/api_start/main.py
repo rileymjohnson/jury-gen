@@ -53,4 +53,3 @@ def lambda_handler(event, context):
     except Exception as e:
         logger.exception("Failed to start execution")
         return _response(500, {'error': f'Failed to start execution: {e}'})
-

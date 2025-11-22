@@ -3,7 +3,6 @@ import os
 import json
 import datetime
 import logging
-import uuid  # <-- Import the UUID library
 
 # Set up logging
 logger = logging.getLogger()
@@ -24,26 +23,24 @@ def lambda_handler(event, context):
     Starts the jury instruction job.
     
     1. Receives the initial job payload (file paths).
-    2. *Generates* a new unique jury_instruction_id.
+    2. Expects a provided 'jury_instruction_id' from the caller (Edge Function/API).
     3. Writes a new item to DynamoDB with status "PROCESSING".
-    4. Returns the *new* state, including the generated ID.
+    4. Returns the state including the provided ID.
     """
     
-    # The 'event' is the input from the client (e.g., from API Gateway)
-    # We now expect it to *only* contain 'files'.
+    # The 'event' is the input from the Step Function start (via API/Edge Function)
+    # We now expect it to contain both 'jury_instruction_id' and 'files'.
     try:
+        job_id = event['jury_instruction_id']
         files = event['files']
+        if not job_id:
+            raise KeyError("Input event must contain 'jury_instruction_id'")
         if not files:
             raise KeyError("Input event must contain 'files'")
 
     except (TypeError, KeyError) as e:
         logger.error(f"Invalid input event. Missing 'files' key: {str(e)}")
         raise ValueError(f"Invalid input event: {str(e)}")
-
-    # --- ID Generation ---
-    # Generate a new, unique job ID
-    job_id = str(uuid.uuid4())
-    # ---------------------
 
     created_at = datetime.datetime.utcnow().isoformat()
 
@@ -61,10 +58,8 @@ def lambda_handler(event, context):
         
         logger.info(f"Successfully started job {job_id} and saved to DynamoDB.")
 
-        # --- Critical Return Value ---
-        # We must return the new job_id so the Step Function
-        # (and the client) knows what it is.
-        # We also pass along the original 'files' for the next step.
+        # Return the provided job_id so the Step Function and downstream tasks
+        # can correlate updates and results.
         return {
             'jury_instruction_id': job_id,
             'files': files
