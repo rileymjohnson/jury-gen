@@ -422,12 +422,15 @@ def extract_claims(chunks: list[str], window_size: int = 3) -> list[dict]:
         List of {'claim_id': int|None, 'raw_texts': list[str]} dicts
     """
     # Extract plaintiff's claims with sliding window
+    print('RAW')
     raw_claims = extract_raw_claims(chunks, window_size, claim_type="claims")
     
     # Deduplicate
+    print('DEDUPLICATE')
     deduplicated = deduplicate_claims(raw_claims)
     
     # Match to database
+    print('MATCH')
     matched = match_claims_to_database(deduplicated)
     
     return matched
@@ -440,12 +443,15 @@ def extract_counterclaims(chunks: list[str], window_size: int = 3) -> list[dict]
         List of {'claim_id': int|None, 'raw_texts': list[str]} dicts
     """
     # Extract defendant's counterclaims with sliding window
+    print('RAW')
     raw_counterclaims = extract_raw_claims(chunks, window_size, claim_type="counterclaims")
     
     # Deduplicate
+    print('DEDUPLICATE')
     deduplicated = deduplicate_claims(raw_counterclaims)
     
     # Match to database
+    print('MATCH')
     matched = match_claims_to_database(deduplicated)
     
     return matched
