@@ -164,6 +164,8 @@ Return matches for ALL {len(claims)} extracted claims."""
         # Fallback: no matches
         return [{'claim_id': None, 'raw_texts': c.get('raw_texts', [])} for c in claims]
     print('TEN')
+    print('MATCHES', matches)
+    print('CLAIMS', claims)
     # Build result maintaining order
     result = []
     match_dict = {m['claim_index']: m['claim_id'] for m in matches}
