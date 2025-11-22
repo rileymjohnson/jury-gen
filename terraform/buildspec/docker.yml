@@ -1,0 +1,32 @@
+version: 0.2
+env:
+  variables:
+    AWS_DEFAULT_REGION: us-east-1
+phases:
+  pre_build:
+    commands:
+      - echo Logging in to Amazon ECR...
+      - aws ecr get-login-password --region $AWS_DEFAULT_REGION | docker login --username AWS --password-stdin ${ACCOUNT_ID}.dkr.ecr.${AWS_DEFAULT_REGION}.amazonaws.com
+      - COMMIT_SHA=${CODEBUILD_RESOLVED_SOURCE_VERSION}
+      - SHORT_SHA=${COMMIT_SHA:0:7}
+      - echo Using tag $SHORT_SHA
+  build:
+    commands:
+      - echo Building Docker images...
+      - docker build -t jury-app/extract-legal-claims:$SHORT_SHA lambdas/extract_legal_claims
+      - docker build -t jury-app/generate-instructions:$SHORT_SHA lambdas/generate_instructions
+      - docker build -t jury-app/textract-get-results:$SHORT_SHA lambdas/textract_get_results
+  post_build:
+    commands:
+      - echo Tagging and pushing...
+      - docker tag jury-app/extract-legal-claims:$SHORT_SHA ${ACCOUNT_ID}.dkr.ecr.${AWS_DEFAULT_REGION}.amazonaws.com/jury-app/extract-legal-claims:$SHORT_SHA
+      - docker tag jury-app/generate-instructions:$SHORT_SHA ${ACCOUNT_ID}.dkr.ecr.${AWS_DEFAULT_REGION}.amazonaws.com/jury-app/generate-instructions:$SHORT_SHA
+      - docker tag jury-app/textract-get-results:$SHORT_SHA ${ACCOUNT_ID}.dkr.ecr.${AWS_DEFAULT_REGION}.amazonaws.com/jury-app/textract-get-results:$SHORT_SHA
+      - docker push ${ACCOUNT_ID}.dkr.ecr.${AWS_DEFAULT_REGION}.amazonaws.com/jury-app/extract-legal-claims:$SHORT_SHA
+      - docker push ${ACCOUNT_ID}.dkr.ecr.${AWS_DEFAULT_REGION}.amazonaws.com/jury-app/generate-instructions:$SHORT_SHA
+      - docker push ${ACCOUNT_ID}.dkr.ecr.${AWS_DEFAULT_REGION}.amazonaws.com/jury-app/textract-get-results:$SHORT_SHA
+      - printf '{"extract_legal_claims":"%s","generate_instructions":"%s","textract_get_results":"%s"}' "$SHORT_SHA" "$SHORT_SHA" "$SHORT_SHA" > images.json
+artifacts:
+  files:
+    - images.json
+

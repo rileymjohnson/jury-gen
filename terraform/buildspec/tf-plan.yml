@@ -1,0 +1,30 @@
+version: 0.2
+env:
+  variables:
+    AWS_DEFAULT_REGION: us-east-1
+phases:
+  install:
+    commands:
+      - echo Installing Terraform and jq...
+      - curl -sLo terraform.zip https://releases.hashicorp.com/terraform/1.9.8/terraform_1.9.8_linux_amd64.zip
+      - unzip -q terraform.zip -d /usr/local/bin
+      - terraform -version
+      - yum install -y jq >/dev/null 2>&1 || true
+  build:
+    commands:
+      - echo Preparing Terraform plan...
+      - cd terraform
+      - IMAGE_TAGS=$(cat ../images.json)
+      - ELC_TAG=$(echo $IMAGE_TAGS | jq -r '.extract_legal_claims')
+      - GI_TAG=$(echo $IMAGE_TAGS | jq -r '.generate_instructions')
+      - TGR_TAG=$(echo $IMAGE_TAGS | jq -r '.textract_get_results')
+      - terraform init -input=false
+      - terraform plan -out=tfplan -input=false \
+          -var="extract_legal_claims_tag=$ELC_TAG" \
+          -var="generate_instructions_tag=$GI_TAG" \
+          -var="textract_get_results_tag=$TGR_TAG"
+artifacts:
+  files:
+    - terraform/tfplan
+    - images.json
+
