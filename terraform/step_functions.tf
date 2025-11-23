@@ -305,6 +305,36 @@ resource "aws_sfn_state_machine" "jury_app_workflow" {
           }
         },
         "ResultPath": "$.claims",
+        "Next": "EnrichCounterclaims"
+      },
+
+      "EnrichCounterclaims": {
+        "Type": "Map",
+        "InputPath": "$",
+        "ItemsPath": "$.counterclaims",
+        "MaxConcurrency": 5,
+        "Parameters": {
+          "item.$": "$$.Map.Item.Value",
+          "complaint_chunks.$": "$.complaint_chunks",
+          "answer_chunks.$": "$.answer_chunks"
+        },
+        "Iterator": {
+          "StartAt": "EnrichCounterclaimItem",
+          "States": {
+            "EnrichCounterclaimItem": {
+              "Type": "Task",
+              "Resource": "${aws_lambda_function.enrich_legal_item.arn}",
+              "Parameters": {
+                "item.$": "$.item",
+                "type": "counterclaim",
+                "complaint_chunks.$": "$.complaint_chunks",
+                "answer_chunks.$": "$.answer_chunks"
+              },
+              "End": true
+            }
+          }
+        },
+        "ResultPath": "$.counterclaims",
         "Next": "GenerateInstructions"
       },
 
