@@ -273,8 +273,7 @@ def generate_custom_instructions(claim_info, claim, case_facts):
     Returns:
         List of instruction dicts with customized_text and reasoning
     """
-    print('claim_info', claim_info)
-    print('claim', claim)
+    print('claim', [a for a in dir(claim) if not a.startswith('_')])
     
     defenses_list = "\n".join([
         f"- {d['name']}: {d['raw_text']}" 
