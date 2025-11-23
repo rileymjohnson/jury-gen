@@ -273,6 +273,8 @@ def generate_custom_instructions(claim_info, claim, case_facts):
     Returns:
         List of instruction dicts with customized_text and reasoning
     """
+    print('claim_info', claim_info)
+    print('claim', claim)
     
     defenses_list = "\n".join([
         f"- {d['name']}: {d['raw_text']}" 
