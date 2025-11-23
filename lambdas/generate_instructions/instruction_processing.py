@@ -371,6 +371,8 @@ Each instruction should be a separate item in the array."""
             # Add number field for consistency with standard instructions
             for i, inst in enumerate(instructions, 1):
                 inst['number'] = f"CUSTOM-{claim.title.upper().replace(' ', '-')}-{i}"
+                inst['claim_description'] = claim.description
+                inst['claim_elements'] = claim.elements
             return instructions
     
     return []
