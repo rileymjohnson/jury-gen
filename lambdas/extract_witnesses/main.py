@@ -13,7 +13,7 @@ def lambda_handler(event, context):
     """
     Extracts witness names from a list of text chunks.
     
-    1. Receives { "chunks": [...] } from the step.
+    1. Receives a list of text chunks from the step.
     2. Calls the 'extract_witnesses' function.
     3. Returns the list of extracted witnesses.
     """

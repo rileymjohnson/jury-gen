@@ -129,6 +129,58 @@ resource "aws_sfn_state_machine" "jury_app_workflow" {
                 "Cause": "Textract reported FAILED for answer"
               }
             }
+          },
+          {
+            "StartAt": "StartWitnessTextract",
+            "States": {
+              "StartWitnessTextract": {
+                "Type": "Task",
+                "Resource": "${aws_lambda_function.textract_start.arn}",
+                "InputPath": "$.job_data.files.witness",
+                "ResultPath": "$.witness_textract",
+                "Next": "WaitWitness"
+              },
+              "WaitWitness": {
+                "Type": "Wait",
+                "Seconds": 30,
+                "Next": "CheckWitnessStatus"
+              },
+              "CheckWitnessStatus": {
+                "Type": "Task",
+                "Resource": "${aws_lambda_function.textract_check_status.arn}",
+                "InputPath": "$.witness_textract",
+                "ResultPath": "$.witness_textract.status",
+                "Next": "IsWitnessReady"
+              },
+              "IsWitnessReady": {
+                "Type": "Choice",
+                "Choices": [
+                  {
+                    "Variable": "$.witness_textract.status.Status",
+                    "StringEquals": "SUCCEEDED",
+                    "Next": "GetWitnessResults"
+                  },
+                  {
+                    "Variable": "$.witness_textract.status.Status",
+                    "StringEquals": "FAILED",
+                    "Next": "WitnessBranchFail"
+                  }
+                ],
+                "Default": "WaitWitness"
+              },
+              "GetWitnessResults": {
+                "Type": "Task",
+                "Resource": "${aws_lambda_function.textract_get_results.arn}",
+                "InputPath": "$.witness_textract",
+                "ResultPath": "$.witness_chunks",
+                "End": true
+              },
+              "WitnessBranchFail": {
+                "Type": "Fail",
+                "Error": "WitnessTextractFailed",
+                "Cause": "Textract reported FAILED for witness list"
+              }
+            }
           }
         ]
       },
@@ -139,6 +191,7 @@ resource "aws_sfn_state_machine" "jury_app_workflow" {
           "jury_instruction_id.$": "$.job_data.jury_instruction_id",
           "complaint_chunks.$": "$.documents[0].complaint_chunks",
           "answer_chunks.$": "$.documents[1].answer_chunks",
+          "witness_chunks.$": "$.documents[2].witness_chunks",
           "job_data.$": "$.job_data"
         },
         "Next": "ExtractCoreData"
@@ -185,7 +238,7 @@ resource "aws_sfn_state_machine" "jury_app_workflow" {
               "ExtractWitnesses": {
                 "Type": "Task",
                 "Resource": "${aws_lambda_function.extract_witnesses.arn}",
-                "InputPath": "$.complaint_chunks",
+                "InputPath": "$.witness_chunks",
                 "ResultPath": "$.witnesses",
                 "End": true
               }
@@ -199,7 +252,8 @@ resource "aws_sfn_state_machine" "jury_app_workflow" {
                 "Resource": "${aws_lambda_function.extract_case_facts.arn}",
                 "Parameters": {
                   "complaint_chunks.$": "$.complaint_chunks",
-                  "answer_chunks.$": "$.answer_chunks"
+                  "answer_chunks.$": "$.answer_chunks",
+                  "witness_chunks.$": "$.witness_chunks"
                 },
                 "ResultPath": "$.case_facts",
                 "End": true
