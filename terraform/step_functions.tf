@@ -275,66 +275,96 @@ resource "aws_sfn_state_machine" "jury_app_workflow" {
           "witnesses.$": "$.core_results[2].witnesses",
           "case_facts.$": "$.core_results[3].case_facts"
         },
-        "Next": "EnrichClaims"
+        "Next": "EnrichCore"
       },
 
-      "EnrichClaims": {
-        "Type": "Map",
-        "InputPath": "$",
-        "ItemsPath": "$.claims",
-        "MaxConcurrency": 5,
-        "Parameters": {
-          "item.$": "$$.Map.Item.Value",
-          "complaint_chunks.$": "$.complaint_chunks",
-          "answer_chunks.$": "$.answer_chunks"
-        },
-        "Iterator": {
-          "StartAt": "EnrichClaimItem",
-          "States": {
-            "EnrichClaimItem": {
-              "Type": "Task",
-              "Resource": "${aws_lambda_function.enrich_legal_item.arn}",
-              "Parameters": {
-                "item.$": "$.item",
-                "type": "claim",
-                "complaint_chunks.$": "$.complaint_chunks",
-                "answer_chunks.$": "$.answer_chunks"
-              },
-              "End": true
+      "EnrichCore": {
+        "Type": "Parallel",
+        "Branches": [
+          {
+            "StartAt": "EnrichClaims",
+            "States": {
+              "EnrichClaims": {
+                "Type": "Map",
+                "InputPath": "$",
+                "ItemsPath": "$.claims",
+                "MaxConcurrency": 5,
+                "Parameters": {
+                  "item.$": "$$.Map.Item.Value",
+                  "complaint_chunks.$": "$.complaint_chunks",
+                  "answer_chunks.$": "$.answer_chunks"
+                },
+                "Iterator": {
+                  "StartAt": "EnrichClaimItem",
+                  "States": {
+                    "EnrichClaimItem": {
+                      "Type": "Task",
+                      "Resource": "${aws_lambda_function.enrich_legal_item.arn}",
+                      "Parameters": {
+                        "item.$": "$.item",
+                        "type": "claim",
+                        "complaint_chunks.$": "$.complaint_chunks",
+                        "answer_chunks.$": "$.answer_chunks"
+                      },
+                      "End": true
+                    }
+                  }
+                },
+                "ResultPath": "$.claims",
+                "End": true
+              }
+            }
+          },
+          {
+            "StartAt": "EnrichCounterclaims",
+            "States": {
+              "EnrichCounterclaims": {
+                "Type": "Map",
+                "InputPath": "$",
+                "ItemsPath": "$.counterclaims",
+                "MaxConcurrency": 5,
+                "Parameters": {
+                  "item.$": "$$.Map.Item.Value",
+                  "complaint_chunks.$": "$.complaint_chunks",
+                  "answer_chunks.$": "$.answer_chunks"
+                },
+                "Iterator": {
+                  "StartAt": "EnrichCounterclaimItem",
+                  "States": {
+                    "EnrichCounterclaimItem": {
+                      "Type": "Task",
+                      "Resource": "${aws_lambda_function.enrich_legal_item.arn}",
+                      "Parameters": {
+                        "item.$": "$.item",
+                        "type": "counterclaim",
+                        "complaint_chunks.$": "$.complaint_chunks",
+                        "answer_chunks.$": "$.answer_chunks"
+                      },
+                      "End": true
+                    }
+                  }
+                },
+                "ResultPath": "$.counterclaims",
+                "End": true
+              }
             }
           }
-        },
-        "ResultPath": "$.claims",
-        "Next": "EnrichCounterclaims"
+        ],
+        "ResultPath": "$.enriched",
+        "Next": "AssembleEnrichedResults"
       },
 
-      "EnrichCounterclaims": {
-        "Type": "Map",
-        "InputPath": "$",
-        "ItemsPath": "$.counterclaims",
-        "MaxConcurrency": 5,
+      "AssembleEnrichedResults": {
+        "Type": "Pass",
         "Parameters": {
-          "item.$": "$$.Map.Item.Value",
+          "jury_instruction_id.$": "$.jury_instruction_id",
+          "job_data.$": "$.job_data",
           "complaint_chunks.$": "$.complaint_chunks",
-          "answer_chunks.$": "$.answer_chunks"
+          "answer_chunks.$": "$.answer_chunks",
+          "case_facts.$": "$.case_facts",
+          "claims.$": "$.enriched[0].claims",
+          "counterclaims.$": "$.enriched[1].counterclaims"
         },
-        "Iterator": {
-          "StartAt": "EnrichCounterclaimItem",
-          "States": {
-            "EnrichCounterclaimItem": {
-              "Type": "Task",
-              "Resource": "${aws_lambda_function.enrich_legal_item.arn}",
-              "Parameters": {
-                "item.$": "$.item",
-                "type": "counterclaim",
-                "complaint_chunks.$": "$.complaint_chunks",
-                "answer_chunks.$": "$.answer_chunks"
-              },
-              "End": true
-            }
-          }
-        },
-        "ResultPath": "$.counterclaims",
         "Next": "GenerateInstructions"
       },
 
