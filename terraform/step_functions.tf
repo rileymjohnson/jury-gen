@@ -361,6 +361,7 @@ resource "aws_sfn_state_machine" "jury_app_workflow" {
           "job_data.$": "$.job_data",
           "complaint_chunks.$": "$.complaint_chunks",
           "answer_chunks.$": "$.answer_chunks",
+          "witnesses.$": "$.witnesses",
           "case_facts.$": "$.case_facts",
           "claims.$": "$.enriched[0].claims",
           "counterclaims.$": "$.enriched[1].counterclaims"
