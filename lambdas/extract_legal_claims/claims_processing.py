@@ -1,7 +1,6 @@
 from supabase import create_client
 import boto3
 
-from types import SimpleNamespace
 import json
 
 bedrock = boto3.client('bedrock-runtime')
@@ -14,8 +13,7 @@ supabase = create_client(
     SUPABASE_KEY
 )
 
-database_claims = supabase.table('claims').select('*').execute().data
-database_claims = [SimpleNamespace(**c) for c in database_claims]
+database_claims = supabase.table('claims').select('*').execute().data  # list[dict]
 
 def _normalize_grouped_claims(claims: list) -> list[dict]:
     """Normalize to [{'name': str, 'raw_texts': [str, ...]}]."""
@@ -68,8 +66,8 @@ def match_claims_to_database(claims: list[dict]) -> list[dict]:
     """
     # Format database claims for the prompt
     database_claims_text = "\n".join([
-        f"ID {claim.id}: {claim.title}" + 
-        (f" - {claim.description[:100]}..." if claim.description else "")
+        f"ID {claim.get('id')}: {claim.get('title')}" +
+        (f" - {claim.get('description','')[:100]}..." if claim.get('description') else "")
         for claim in database_claims
     ])
     print('TWO')

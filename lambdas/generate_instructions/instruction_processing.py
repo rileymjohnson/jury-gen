@@ -1,7 +1,6 @@
 from supabase import create_client
 import boto3
 
-from types import SimpleNamespace
 import json
 
 bedrock = boto3.client('bedrock-runtime')
@@ -14,11 +13,10 @@ supabase = create_client(
     SUPABASE_KEY
 )
 
-database_claims = supabase.table('claims').select('*').execute().data
-database_claims = [SimpleNamespace(**c) for c in database_claims]
+database_claims = supabase.table('claims').select('*').execute().data  # list[dict]
 
 def database_get_claim_by_id(claim_id):
-    matches = [c for c in database_claims if c.id == claim_id]
+    matches = [c for c in database_claims if c.get('id') == claim_id]
 
     return matches[0] if len(matches) > 0 else None
 
@@ -233,26 +231,26 @@ def select_and_customize_instructions(category_number, claim, claim_elements, de
     """
     
     # Get all sub-instructions in this category
-    sub_instructions = [SimpleNamespace(**r) for r in supabase.table('standard_jury_instructions') \
+    sub_instructions = supabase.table('standard_jury_instructions') \
         .select('*') \
         .eq('category_number', category_number) \
         .order('number', desc=False) \
         .execute() \
-        .data]
+        .data
     
     # Format for LLM
     instructions_summary = []
     for inst in sub_instructions:
         instructions_summary.append({
-            "number": inst.number,
-            "title": inst.title,
-            "main_paragraph": inst.main_paragraph,
-            "notes_on_use": inst.notes_on_use or []
+            "number": inst.get('number'),
+            "title": inst.get('title'),
+            "main_paragraph": inst.get('main_paragraph'),
+            "notes_on_use": inst.get('notes_on_use') or []
         })
     
     # Ask LLM to select which ones apply
     selected = llm_select_instructions(
-        claim_title=claim.title,
+        claim_title=claim.get('title'),
         claim_elements=claim_elements,
         defenses=defenses,
         case_facts=case_facts,
@@ -273,14 +271,14 @@ def generate_custom_instructions(claim_info, claim, case_facts):
     Returns:
         List of instruction dicts with customized_text and reasoning
     """
-    print('claim', [a for a in dir(claim) if not a.startswith('_')])
+    print('claim', list(claim.keys()))
     
     defenses_list = "\n".join([
         f"- {d['name']}: {d['raw_text']}" 
         for d in claim_info.get('defenses', [])
     ])
     
-    elements_list = "\n".join([f"- {elem}" for elem in claim.elements])
+    elements_list = "\n".join([f"- {elem}" for elem in claim.get('elements', [])])
     
     tools = [{
         "name": "generate_custom_instructions",
@@ -313,13 +311,13 @@ def generate_custom_instructions(claim_info, claim, case_facts):
     
     prompt = f"""Generate custom jury instructions for a claim that has no standard Florida instruction.
 
-CLAIM: {claim.title}
+CLAIM: {claim.get('title')}
 
 CLAIM ELEMENTS (from Florida Litigation Guide):
 {elements_list}
 
 CLAIM DESCRIPTION:
-{claim.description or 'No description available'}
+{claim.get('description') or 'No description available'}
 
 DEFENSES RAISED:
 {defenses_list}
@@ -370,9 +368,10 @@ Each instruction should be a separate item in the array."""
             instructions = item['input']['instructions']
             # Add number field for consistency with standard instructions
             for i, inst in enumerate(instructions, 1):
-                inst['number'] = f"CUSTOM-{claim.title.upper().replace(' ', '-')}-{i}"
-                inst['claim_description'] = claim.description
-                inst['claim_elements'] = claim.elements
+                title = (claim.get('title') or '').upper().replace(' ', '-')
+                inst['number'] = f"CUSTOM-{title}-{i}"
+                inst['claim_description'] = claim.get('description')
+                inst['claim_elements'] = claim.get('elements')
             return instructions
     
     return []
@@ -392,7 +391,7 @@ def generate_instructions(claims, counterclaims, case_facts):
             continue
 
         category = match_claim_to_category(
-            claim_title=claim.title,
+            claim_title=claim.get('title'),
             case_facts=case_facts,
             standard_categories=standard_instruction_categories
         )
@@ -401,7 +400,7 @@ def generate_instructions(claims, counterclaims, case_facts):
             selected_instructions = select_and_customize_instructions(
                 category_number=category,
                 claim=claim,
-                claim_elements=claim.elements,
+                claim_elements=claim.get('elements'),
                 defenses=claim_info.get('defenses', []),
                 case_facts=case_facts
             )
@@ -416,7 +415,7 @@ def generate_instructions(claims, counterclaims, case_facts):
             continue
 
         category = match_claim_to_category(
-            claim_title=claim.title,
+            claim_title=claim.get('title'),
             case_facts=case_facts,
             standard_categories=standard_instruction_categories
         )
@@ -425,7 +424,7 @@ def generate_instructions(claims, counterclaims, case_facts):
             selected_instructions = select_and_customize_instructions(
                 category_number=category,
                 claim=claim,
-                claim_elements=claim.elements,
+                claim_elements=claim.get('elements'),
                 defenses=[],  # Counterclaims don't have defenses from plaintiff
                 case_facts=case_facts
             )
