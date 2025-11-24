@@ -39,8 +39,9 @@ locals {
   claims_raw = jsondecode(file("${path.module}/data/claims.json"))
   sji_raw    = jsondecode(file("${path.module}/data/standard_jury_instructions.json"))
 
-  claims_map = { for o in local.claims_raw : o.id => o }
-  sji_map    = { for o in local.sji_raw    : o.id => o }
+  # Only include items with a non-empty id
+  claims_map = { for o in local.claims_raw : o.id => o if try(length(trimspace(tostring(o.id))) > 0, false) }
+  sji_map    = { for o in local.sji_raw    : o.id => o if try(length(trimspace(tostring(o.id))) > 0, false) }
 }
 
 resource "aws_dynamodb_table_item" "claims_items" {
@@ -48,8 +49,21 @@ resource "aws_dynamodb_table_item" "claims_items" {
   table_name = aws_dynamodb_table.claims.name
   hash_key   = "id"
 
-  # Store all attributes as strings for simplicity
-  item = jsonencode({ for k, v in each.value : k => { S = tostring(v) } })
+  # Build a full attribute map, preserving scalars as types and
+  # encoding complex types (lists/maps) as JSON strings.
+  item = jsonencode(merge(
+    { id = { S = tostring(each.value.id) } },
+    { for k, v in each.value :
+        k => (
+          can(tomap(v))  ? { S = jsonencode(v) } :
+          can(tolist(v)) ? { S = jsonencode(v) } :
+          try(v == true || v == false, false) ? { BOOL = v } :
+          can(tonumber(v)) ? { N = tostring(v) } :
+          { S = tostring(v) }
+        )
+        if k != "id" && try(v != null && (can(tomap(v)) || can(tolist(v)) || length(tostring(v)) > 0), false)
+    }
+  ))
 }
 
 resource "aws_dynamodb_table_item" "sji_items" {
@@ -57,6 +71,19 @@ resource "aws_dynamodb_table_item" "sji_items" {
   table_name = aws_dynamodb_table.standard_jury_instructions.name
   hash_key   = "id"
 
-  # Store all attributes as strings for simplicity
-  item = jsonencode({ for k, v in each.value : k => { S = tostring(v) } })
+  # Build a full attribute map, preserving scalars as types and
+  # encoding complex types (lists/maps) as JSON strings.
+  item = jsonencode(merge(
+    { id = { S = tostring(each.value.id) } },
+    { for k, v in each.value :
+        k => (
+          can(tomap(v))  ? { S = jsonencode(v) } :
+          can(tolist(v)) ? { S = jsonencode(v) } :
+          try(v == true || v == false, false) ? { BOOL = v } :
+          can(tonumber(v)) ? { N = tostring(v) } :
+          { S = tostring(v) }
+        )
+        if k != "id" && try(v != null && (can(tomap(v)) || can(tolist(v)) || length(tostring(v)) > 0), false)
+    }
+  ))
 }
