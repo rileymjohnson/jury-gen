@@ -135,6 +135,12 @@ resource "aws_lambda_function" "extract_legal_claims" {
   timeout       = 600 # This has many Bedrock calls
 
   image_uri = "${data.aws_caller_identity.current.account_id}.dkr.ecr.${data.aws_region.current.name}.amazonaws.com/${aws_ecr_repository.extract_legal_claims.name}:${var.extract_legal_claims_tag}"
+
+  environment {
+    variables = {
+      DYNAMODB_CLAIMS_TABLE_NAME = aws_dynamodb_table.claims.name
+    }
+  }
 }
 
 resource "aws_lambda_function" "extract_witnesses" {
@@ -176,6 +182,13 @@ resource "aws_lambda_function" "generate_instructions" {
   # Using pre-created ECR repo for this image
   # Update the repository path below if your repo name differs
   image_uri = "${data.aws_caller_identity.current.account_id}.dkr.ecr.${data.aws_region.current.name}.amazonaws.com/jury-app/generate-instructions:${var.generate_instructions_tag}"
+
+  environment {
+    variables = {
+      DYNAMODB_CLAIMS_TABLE_NAME = aws_dynamodb_table.claims.name
+      DYNAMODB_STANDARD_JURY_INSTRUCTIONS_TABLE_NAME = aws_dynamodb_table.standard_jury_instructions.name
+    }
+  }
 }
 
 # --- Job Finish Lambdas ---
