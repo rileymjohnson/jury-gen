@@ -49,14 +49,19 @@ resource "aws_dynamodb_table_item" "claims_items" {
   table_name = aws_dynamodb_table.claims.name
   hash_key   = "id"
 
-  # Build a full attribute map, preserving scalars as types and
-  # encoding complex types (lists/maps) as JSON strings.
+  # Build a full attribute map, preserving scalars as native types.
+  # - Lists are stored as DynamoDB L (list of typed values)
+  # - Maps are JSON-encoded strings (keeps implementation simple and robust)
   item = jsonencode(merge(
     { id = { S = tostring(each.value.id) } },
     { for k, v in each.value :
         k => (
           can(tomap(v))  ? { S = jsonencode(v) } :
-          can(tolist(v)) ? { S = jsonencode(v) } :
+          can(tolist(v)) ? { L = [ for i in v : (
+            try(i == true || i == false, false) ? { BOOL = i } :
+            can(tonumber(i)) ? { N = tostring(i) } :
+            { S = tostring(i) }
+          ) ] } :
           try(v == true || v == false, false) ? { BOOL = v } :
           can(tonumber(v)) ? { N = tostring(v) } :
           { S = tostring(v) }
@@ -71,14 +76,19 @@ resource "aws_dynamodb_table_item" "sji_items" {
   table_name = aws_dynamodb_table.standard_jury_instructions.name
   hash_key   = "id"
 
-  # Build a full attribute map, preserving scalars as types and
-  # encoding complex types (lists/maps) as JSON strings.
+  # Build a full attribute map, preserving scalars as native types.
+  # - Lists are stored as DynamoDB L (list of typed values)
+  # - Maps are JSON-encoded strings (keeps implementation simple and robust)
   item = jsonencode(merge(
     { id = { S = tostring(each.value.id) } },
     { for k, v in each.value :
         k => (
           can(tomap(v))  ? { S = jsonencode(v) } :
-          can(tolist(v)) ? { S = jsonencode(v) } :
+          can(tolist(v)) ? { L = [ for i in v : (
+            try(i == true || i == false, false) ? { BOOL = i } :
+            can(tonumber(i)) ? { N = tostring(i) } :
+            { S = tostring(i) }
+          ) ] } :
           try(v == true || v == false, false) ? { BOOL = v } :
           can(tonumber(v)) ? { N = tostring(v) } :
           { S = tostring(v) }
