@@ -49,25 +49,19 @@ resource "aws_dynamodb_table_item" "claims_items" {
   table_name = aws_dynamodb_table.claims.name
   hash_key   = "id"
 
-  # Build a full attribute map, preserving scalars as native types.
-  # - Lists are stored as DynamoDB L (list of typed values)
-  # - Maps are JSON-encoded strings (keeps implementation simple and robust)
+  # Explicit schema for Claims items
+  # Ensures attributes are always written with expected DynamoDB types
   item = jsonencode(merge(
     { id = { S = tostring(each.value.id) } },
-    { for k, v in each.value :
-        k => (
-          can(tomap(v))  ? { S = jsonencode(v) } :
-          can(tolist(v)) ? { L = [ for i in v : (
-            try(i == true || i == false, false) ? { BOOL = i } :
-            can(tonumber(i)) ? { N = tostring(i) } :
-            { S = tostring(i) }
-          ) ] } :
-          try(v == true || v == false, false) ? { BOOL = v } :
-          can(tonumber(v)) ? { N = tostring(v) } :
-          { S = tostring(v) }
-        )
-        if k != "id" && try(v != null && (can(tomap(v)) || can(tolist(v)) || length(tostring(v)) > 0), false)
-    }
+    try(length(trimspace(tostring(each.value.title))) > 0, false) ? { title = { S = tostring(each.value.title) } } : {},
+    # description may be null; use NULL=true when null, or S when non-empty
+    try(each.value.description, null) == null ? { description = { NULL = true } } : (
+      try(length(trimspace(tostring(each.value.description))) > 0, false) ? { description = { S = tostring(each.value.description) } } : {}
+    ),
+    # elements: list of strings (possibly empty)
+    { elements = { L = [ for s in try(each.value.elements, []) : { S = tostring(s) } ] } },
+    # defenses: list of strings (possibly empty)
+    { defenses = { L = [ for s in try(each.value.defenses, []) : { S = tostring(s) } ] } }
   ))
 }
 
@@ -76,24 +70,20 @@ resource "aws_dynamodb_table_item" "sji_items" {
   table_name = aws_dynamodb_table.standard_jury_instructions.name
   hash_key   = "id"
 
-  # Build a full attribute map, preserving scalars as native types.
-  # - Lists are stored as DynamoDB L (list of typed values)
-  # - Maps are JSON-encoded strings (keeps implementation simple and robust)
+  # Explicit schema for Standard Jury Instructions items
   item = jsonencode(merge(
     { id = { S = tostring(each.value.id) } },
-    { for k, v in each.value :
-        k => (
-          can(tomap(v))  ? { S = jsonencode(v) } :
-          can(tolist(v)) ? { L = [ for i in v : (
-            try(i == true || i == false, false) ? { BOOL = i } :
-            can(tonumber(i)) ? { N = tostring(i) } :
-            { S = tostring(i) }
-          ) ] } :
-          try(v == true || v == false, false) ? { BOOL = v } :
-          can(tonumber(v)) ? { N = tostring(v) } :
-          { S = tostring(v) }
-        )
-        if k != "id" && try(v != null && (can(tomap(v)) || can(tolist(v)) || length(tostring(v)) > 0), false)
-    }
+    try(length(trimspace(tostring(each.value.number))) > 0, false) ? { number = { S = tostring(each.value.number) } } : {},
+    try(length(trimspace(tostring(each.value.title))) > 0, false) ? { title = { S = tostring(each.value.title) } } : {},
+    try(length(trimspace(tostring(each.value.category_title))) > 0, false) ? { category_title = { S = tostring(each.value.category_title) } } : {},
+    try(length(trimspace(tostring(each.value.category_number))) > 0, false) ? { category_number = { S = tostring(each.value.category_number) } } : {},
+    try(length(trimspace(tostring(each.value.url))) > 0, false) ? { url = { S = tostring(each.value.url) } } : {},
+    # Use NULL=true when null, or S when non-empty
+    try(each.value.main_paragraph, null) == null ? { main_paragraph = { NULL = true } } : (
+      try(length(trimspace(tostring(each.value.main_paragraph))) > 0, false) ? { main_paragraph = { S = tostring(each.value.main_paragraph) } } : {}
+    ),
+    try(each.value.notes_on_use, null) == null ? { notes_on_use = { NULL = true } } : (
+      try(length(trimspace(tostring(each.value.notes_on_use))) > 0, false) ? { notes_on_use = { S = tostring(each.value.notes_on_use) } } : {}
+    )
   ))
 }
