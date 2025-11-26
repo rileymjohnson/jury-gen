@@ -1,24 +1,44 @@
-from supabase import create_client
 import boto3
-
+import os
 import json
 
 bedrock = boto3.client('bedrock-runtime')
 
-SUPABASE_URL = 'https://qeuthcemoefancllsckc.supabase.co'
-SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFldXRoY2Vtb2VmYW5jbGxzY2tjIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc2MjUwOTM0MiwiZXhwIjoyMDc4MDg1MzQyfQ.LItXDQxd2Cjrkge3l95WA9zxOg12vcnOOhpvHYLum1M'
+# DynamoDB tables from env
+_CLAIMS_TABLE = os.environ.get('DYNAMODB_CLAIMS_TABLE_NAME', 'Claims')
+_SJI_TABLE = os.environ.get('DYNAMODB_STANDARD_JURY_INSTRUCTIONS_TABLE_NAME', 'StandardJuryInstructions')
+_ddb = boto3.resource('dynamodb')
+_claims_table = _ddb.Table(_CLAIMS_TABLE)
+_sji_table = _ddb.Table(_SJI_TABLE)
 
-supabase = create_client(
-    SUPABASE_URL,
-    SUPABASE_KEY
-)
+def _scan_all(table, filter_expression=None):
+    kwargs = {}
+    if filter_expression:
+        kwargs['FilterExpression'] = filter_expression
+    items = []
+    while True:
+        resp = table.scan(**kwargs)
+        items.extend(resp.get('Items', []))
+        lek = resp.get('LastEvaluatedKey')
+        if not lek:
+            break
+        kwargs['ExclusiveStartKey'] = lek
+    return items
 
-database_claims = supabase.table('claims').select('*').execute().data  # list[dict]
+# Cache database claims at cold start (small reference set)
+database_claims = _scan_all(_claims_table)
 
 def database_get_claim_by_id(claim_id):
+    try:
+        resp = _claims_table.get_item(Key={'id': claim_id})
+        item = resp.get('Item')
+        if item:
+            return item
+    except Exception:
+        pass
+    # Fallback to in-memory cache
     matches = [c for c in database_claims if c.get('id') == claim_id]
-
-    return matches[0] if len(matches) > 0 else None
+    return matches[0] if matches else None
 
 def match_claim_to_category(claim_title, case_facts, standard_categories):
     """
@@ -231,12 +251,16 @@ def select_and_customize_instructions(category_number, claim, claim_elements, de
     """
     
     # Get all sub-instructions in this category
-    sub_instructions = supabase.table('standard_jury_instructions') \
-        .select('*') \
-        .eq('category_number', category_number) \
-        .order('number', desc=False) \
-        .execute() \
-        .data
+    # Scan and filter by category_number, then sort by number
+    # (Consider adding a GSI on category_number if this grows.)
+    from boto3.dynamodb.conditions import Attr
+    sub_instructions = _sji_table.scan(
+        FilterExpression=Attr('category_number').eq(category_number)
+    ).get('Items', [])
+    sub_instructions = sorted(
+        sub_instructions,
+        key=lambda x: str(x.get('number', ''))
+    )
     
     # Format for LLM
     instructions_summary = []
@@ -382,7 +406,12 @@ def generate_instructions(claims, counterclaims, case_facts):
     custom_claims = []
     custom_counterclaims = []
     
-    standard_instruction_categories = sorted({(r['category_number'], r['category_title']) for r in supabase.table('standard_jury_instructions').select('category_number, category_title').execute().data})
+    # Load unique (category_number, category_title) pairs from DynamoDB
+    _all_sji = _scan_all(_sji_table)
+    standard_instruction_categories = sorted({
+        (r.get('category_number'), r.get('category_title'))
+        for r in _all_sji if r.get('category_number') and r.get('category_title')
+    })
     
     for claim_info in claims:
         claim = database_get_claim_by_id(claim_info['claim_id'])

@@ -1,19 +1,28 @@
-from supabase import create_client
 import boto3
-
+import os
 import json
 
 bedrock = boto3.client('bedrock-runtime')
 
-SUPABASE_URL = 'https://qeuthcemoefancllsckc.supabase.co'
-SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFldXRoY2Vtb2VmYW5jbGxzY2tjIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc2MjUwOTM0MiwiZXhwIjoyMDc4MDg1MzQyfQ.LItXDQxd2Cjrkge3l95WA9zxOg12vcnOOhpvHYLum1M'
+# Load claims from DynamoDB instead of Supabase
+_CLAIMS_TABLE = os.environ.get('DYNAMODB_CLAIMS_TABLE_NAME', 'Claims')
+_ddb = boto3.resource('dynamodb')
+_claims_table = _ddb.Table(_CLAIMS_TABLE)
 
-supabase = create_client(
-    SUPABASE_URL,
-    SUPABASE_KEY
-)
+def _scan_all(table):
+    kwargs = {}
+    items = []
+    while True:
+        resp = table.scan(**kwargs)
+        items.extend(resp.get('Items', []))
+        lek = resp.get('LastEvaluatedKey')
+        if not lek:
+            break
+        kwargs['ExclusiveStartKey'] = lek
+    return items
 
-database_claims = supabase.table('claims').select('*').execute().data  # list[dict]
+# Cache database claims at import/cold start
+database_claims = _scan_all(_claims_table)
 
 def _normalize_grouped_claims(claims: list) -> list[dict]:
     """Normalize to [{'name': str, 'raw_texts': [str, ...]}]."""

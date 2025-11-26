@@ -232,7 +232,7 @@ resource "aws_iam_policy" "bedrock_analyzer_policy" {
       },
       { # Read from the standard claims/instructions tables
         Effect   = "Allow",
-        Action   = ["dynamodb:Scan"],
+        Action   = ["dynamodb:Scan", "dynamodb:GetItem"],
         Resource = ["*"]
       }
     ]
