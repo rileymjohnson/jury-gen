@@ -27,11 +27,9 @@ phases:
       - echo "Using images.json at $IMAGE_JSON"
       - IMAGE_TAGS=$(cat "$IMAGE_JSON")
       - cp "$IMAGE_JSON" ./images.json
-      - ELC_TAG=$(echo $IMAGE_TAGS | jq -r '.extract_legal_claims')
-      - GI_TAG=$(echo $IMAGE_TAGS | jq -r '.generate_instructions')
       - TGR_TAG=$(echo $IMAGE_TAGS | jq -r '.textract_get_results')
       - terraform -chdir=terraform init -input=false
-      - terraform -chdir=terraform plan -out=tfplan -input=false -var="extract_legal_claims_tag=$ELC_TAG" -var="generate_instructions_tag=$GI_TAG" -var="textract_get_results_tag=$TGR_TAG"
+      - terraform -chdir=terraform plan -out=tfplan -input=false -var="textract_get_results_tag=$TGR_TAG"
 artifacts:
   files:
     - terraform/tfplan

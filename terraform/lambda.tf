@@ -129,12 +129,13 @@ resource "aws_lambda_function" "textract_get_results" {
 
 # --- Bedrock Lambdas ---
 resource "aws_lambda_function" "extract_legal_claims" {
-  function_name = "JuryApp-ExtractLegalClaims"
-  role          = aws_iam_role.extract_legal_claims.arn
-  package_type  = "Image"
-  timeout       = 600 # This has many Bedrock calls
-
-  image_uri = "${data.aws_caller_identity.current.account_id}.dkr.ecr.${data.aws_region.current.name}.amazonaws.com/${aws_ecr_repository.extract_legal_claims.name}:${var.extract_legal_claims_tag}"
+  function_name    = "JuryApp-ExtractLegalClaims"
+  handler          = "main.lambda_handler"
+  runtime          = "python3.12"
+  role             = aws_iam_role.extract_legal_claims.arn
+  filename         = data.archive_file.extract_legal_claims.output_path
+  source_code_hash = data.archive_file.extract_legal_claims.output_base64sha256
+  timeout          = 600 # This has many Bedrock calls
 
   environment {
     variables = {
@@ -174,14 +175,13 @@ resource "aws_lambda_function" "enrich_legal_item" {
 }
 
 resource "aws_lambda_function" "generate_instructions" {
-  function_name = "JuryApp-GenerateInstructions"
-  role          = aws_iam_role.generate_instructions.arn
-  package_type  = "Image"
-  timeout       = 900 # This is also very long
-
-  # Using pre-created ECR repo for this image
-  # Update the repository path below if your repo name differs
-  image_uri = "${data.aws_caller_identity.current.account_id}.dkr.ecr.${data.aws_region.current.name}.amazonaws.com/jury-app/generate-instructions:${var.generate_instructions_tag}"
+  function_name    = "JuryApp-GenerateInstructions"
+  handler          = "main.lambda_handler"
+  runtime          = "python3.12"
+  role             = aws_iam_role.generate_instructions.arn
+  filename         = data.archive_file.generate_instructions.output_path
+  source_code_hash = data.archive_file.generate_instructions.output_base64sha256
+  timeout          = 900 # This is also very long
 
   environment {
     variables = {
