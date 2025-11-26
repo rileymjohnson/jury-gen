@@ -54,10 +54,8 @@ resource "aws_dynamodb_table_item" "claims_items" {
   item = jsonencode(merge(
     { id = { S = tostring(each.value.id) } },
     try(length(trimspace(tostring(each.value.title))) > 0, false) ? { title = { S = tostring(each.value.title) } } : {},
-    # description may be null; use NULL=true when null, or S when non-empty
-    try(each.value.description, null) == null ? { description = { NULL = true } } : (
-      try(length(trimspace(tostring(each.value.description))) > 0, false) ? { description = { S = tostring(each.value.description) } } : {}
-    ),
+    # description: only store when non-empty (omit when null/empty)
+    try(length(trimspace(tostring(each.value.description))) > 0, false) ? { description = { S = tostring(each.value.description) } } : {},
     # elements: list of strings (possibly empty)
     { elements = { L = [ for s in try(each.value.elements, []) : { S = tostring(s) } ] } },
     # defenses: list of strings (possibly empty)
@@ -78,12 +76,8 @@ resource "aws_dynamodb_table_item" "sji_items" {
     try(length(trimspace(tostring(each.value.category_title))) > 0, false) ? { category_title = { S = tostring(each.value.category_title) } } : {},
     try(length(trimspace(tostring(each.value.category_number))) > 0, false) ? { category_number = { S = tostring(each.value.category_number) } } : {},
     try(length(trimspace(tostring(each.value.url))) > 0, false) ? { url = { S = tostring(each.value.url) } } : {},
-    # Use NULL=true when null, or S when non-empty
-    try(each.value.main_paragraph, null) == null ? { main_paragraph = { NULL = true } } : (
-      try(length(trimspace(tostring(each.value.main_paragraph))) > 0, false) ? { main_paragraph = { S = tostring(each.value.main_paragraph) } } : {}
-    ),
-    try(each.value.notes_on_use, null) == null ? { notes_on_use = { NULL = true } } : (
-      try(length(trimspace(tostring(each.value.notes_on_use))) > 0, false) ? { notes_on_use = { S = tostring(each.value.notes_on_use) } } : {}
-    )
+    # Only store text when non-empty (omit when null/empty)
+    try(length(trimspace(tostring(each.value.main_paragraph))) > 0, false) ? { main_paragraph = { S = tostring(each.value.main_paragraph) } } : {},
+    try(length(trimspace(tostring(each.value.notes_on_use))) > 0, false) ? { notes_on_use = { S = tostring(each.value.notes_on_use) } } : {}
   ))
 }
