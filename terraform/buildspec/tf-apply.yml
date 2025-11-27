@@ -27,7 +27,7 @@ phases:
       - echo "Using images.json at $IMAGE_JSON"
       - IMAGE_TAGS=$(cat "$IMAGE_JSON")
       - TGR_TAG=$(echo $IMAGE_TAGS | jq -r '.textract_get_results')
-      - : "Using environment $TF_ENV"
+      - echo "Using environment $TF_ENV"
       - terraform -chdir=terraform/environments/$TF_ENV init -input=false
       - terraform -chdir=terraform/environments/$TF_ENV apply -auto-approve -input=false -var="textract_get_results_tag=$TGR_TAG"
 artifacts:
