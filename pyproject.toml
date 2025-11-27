@@ -1,0 +1,42 @@
+[build-system]
+requires = ["hatchling>=1.25.0"]
+build-backend = "hatchling.build"
+
+[project]
+name = "jury-gen"
+version = "0.1.0"
+description = "Utilities and infra for jury generation workflows"
+readme = "README.md"
+requires-python = ">=3.10"
+authors = [{ name = "Riley" }]
+license = { text = "Proprietary" }
+dependencies = []
+
+[project.optional-dependencies]
+dev = [
+  "ruff>=0.6.9",
+]
+
+[tool.ruff]
+line-length = 120
+target-version = "py310"
+extend-exclude = [
+  ".venv",
+  "**/*.ipynb",
+  "**/.ipynb_checkpoints",
+  "bootstrap",
+  "terraform",
+]
+
+[tool.ruff.lint]
+select = ["E","F","I","B","UP","PL","SIM","C4","PERF","RUF"]
+
+[tool.ruff.lint.isort]
+combine-as-imports = true
+force-sort-within-sections = true
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+skip-magic-trailing-comma = false
+line-ending = "auto"
