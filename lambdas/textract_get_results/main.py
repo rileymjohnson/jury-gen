@@ -90,11 +90,7 @@ def lambda_handler(event, context):
             response = textract.get_document_text_detection(**kwargs)
 
             blocks = response.get("Blocks", [])
-            all_text_lines.extend(
-                block.get("Text", "")
-                for block in blocks
-                if block.get("BlockType") == "LINE"
-            )
+            all_text_lines.extend(block.get("Text", "") for block in blocks if block.get("BlockType") == "LINE")
 
             next_token = response.get("NextToken")
             if not next_token:

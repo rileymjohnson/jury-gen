@@ -262,12 +262,15 @@ def select_and_customize_instructions(category_number, claim, claim_elements, de
     sub_instructions = sorted(sub_instructions, key=lambda x: str(x.get("number", "")))
 
     # Format for LLM
-    instructions_summary = [{
-        "number": inst.get("number"),
-        "title": inst.get("title"),
-        "main_paragraph": inst.get("main_paragraph"),
-        "notes_on_use": inst.get("notes_on_use") or [],
-    } for inst in sub_instructions]
+    instructions_summary = [
+        {
+            "number": inst.get("number"),
+            "title": inst.get("title"),
+            "main_paragraph": inst.get("main_paragraph"),
+            "notes_on_use": inst.get("notes_on_use") or [],
+        }
+        for inst in sub_instructions
+    ]
 
     # Ask LLM to select which ones apply
     selected = llm_select_instructions(
@@ -314,8 +317,7 @@ def generate_custom_instructions(claim_info, claim, case_facts):
                             "properties": {
                                 "customized_text": {
                                     "type": "string",
-                                    "description": \
-                                        "The full text of this instruction with party names and facts filled in",
+                                    "description": "The full text of this instruction with party names and facts filled in",
                                 },
                                 "reasoning": {
                                     "type": "string",

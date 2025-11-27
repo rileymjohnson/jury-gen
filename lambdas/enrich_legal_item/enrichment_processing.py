@@ -114,8 +114,7 @@ def process_damages_window(claim_context: str, previous_context: str, window_tex
                             "compensatory": {
                                 "type": "array",
                                 "items": {"type": "string"},
-                                "description": \
-                                    "Compensatory/actual damages (e.g., '$50,000', 'lost profits', 'actual damages')",
+                                "description": "Compensatory/actual damages (e.g., '$50,000', 'lost profits', 'actual damages')",
                             },
                             "punitive": {
                                 "type": "array",
@@ -125,8 +124,7 @@ def process_damages_window(claim_context: str, previous_context: str, window_tex
                             "statutory": {
                                 "type": "array",
                                 "items": {"type": "string"},
-                                "description": \
-                                    "Statutory damages (e.g., 'treble damages', 'statutory damages under §XYZ')",
+                                "description": "Statutory damages (e.g., 'treble damages', 'statutory damages under §XYZ')",
                             },
                             "equitable": {
                                 "type": "array",
