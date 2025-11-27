@@ -375,12 +375,12 @@ def extract_damages_for_claim(
         current_context = result["updated_context"]
 
         # Collect damages found in this window
-        for category in all_damages:
-            all_damages[category].extend(result["damages"].get(category, []))
+        for category, all_damages_category in all_damages.items():
+            all_damages_category.extend(result["damages"].get(category, []))
 
     # Deduplicate damages in each category
-    for category in all_damages:
-        if all_damages[category]:
-            all_damages[category] = list(set(all_damages[category]))  # Simple dedup
+    for category, all_damages_category in all_damages.items():
+        if all_damages_category:
+            all_damages[category] = list(set(all_damages_category))  # Simple dedup
 
     return all_damages

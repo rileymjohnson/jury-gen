@@ -2,6 +2,7 @@ import json
 import os
 
 import boto3
+from boto3.dynamodb.conditions import Attr
 
 bedrock = boto3.client("bedrock-runtime")
 
@@ -257,8 +258,6 @@ def select_and_customize_instructions(category_number, claim, claim_elements, de
     # Get all sub-instructions in this category
     # Scan and filter by category_number, then sort by number
     # (Consider adding a GSI on category_number if this grows.)
-    from boto3.dynamodb.conditions import Attr
-
     sub_instructions = _sji_table.scan(FilterExpression=Attr("category_number").eq(category_number)).get("Items", [])
     sub_instructions = sorted(sub_instructions, key=lambda x: str(x.get("number", "")))
 
