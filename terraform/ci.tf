@@ -34,6 +34,11 @@ resource "aws_iam_role" "cb_docker" {
   assume_role_policy = jsonencode({ Version = "2012-10-17", Statement = [{ Effect = "Allow", Principal = { Service = "codebuild.amazonaws.com" }, Action = "sts:AssumeRole" }] })
 }
 
+
+resource "aws_iam_role" "cb_lint" {
+  name               = "JuryGen-CodeBuild-Lint"
+  assume_role_policy = jsonencode({ Version = "2012-10-17", Statement = [{ Effect = "Allow", Principal = { Service = "codebuild.amazonaws.com" }, Action = "sts:AssumeRole" }] })
+}
 resource "aws_iam_role_policy" "cb_docker" {
   name   = "cb-docker-policy"
   role   = aws_iam_role.cb_docker.id
@@ -49,6 +54,19 @@ resource "aws_iam_role_policy" "cb_docker" {
   })
 }
 
+
+resource "aws_iam_role_policy" "cb_lint" {
+  name   = "cb-lint-policy"
+  role   = aws_iam_role.cb_lint.id
+  policy = jsonencode({
+    Version = "2012-10-17",
+    Statement = [
+      { Effect = "Allow", Action = ["logs:CreateLogGroup", "logs:CreateLogStream", "logs:PutLogEvents"], Resource = "*" },
+      { Effect = "Allow", Action = ["s3:PutObject", "s3:GetObject", "s3:GetObjectVersion"], Resource = ["${aws_s3_bucket.ci_artifacts.arn}/*"] },
+      { Effect = "Allow", Action = ["s3:ListBucket"], Resource = [aws_s3_bucket.ci_artifacts.arn] }
+    ]
+  })
+}
 resource "aws_codebuild_project" "docker" {
   name         = "jury-gen-docker"
   service_role = aws_iam_role.cb_docker.arn
@@ -95,6 +113,22 @@ resource "aws_iam_role_policy" "cb_tf" {
   })
 }
 
+resource "aws_codebuild_project" "lint" {
+  name         = "jury-gen-lint"
+  service_role = aws_iam_role.cb_lint.arn
+  artifacts {
+    type = "CODEPIPELINE"
+  }
+  environment {
+    compute_type = "BUILD_GENERAL1_SMALL"
+    image        = "aws/codebuild/standard:7.0"
+    type         = "LINUX_CONTAINER"
+  }
+  source {
+    type      = "CODEPIPELINE"
+    buildspec = "terraform/buildspec/lint.yml"
+  }
+}
 resource "aws_codebuild_project" "tf_plan" {
   name         = "jury-gen-tf-plan"
   service_role = aws_iam_role.cb_tf.arn
@@ -142,7 +176,7 @@ resource "aws_iam_role_policy" "codepipeline" {
     Version = "2012-10-17",
     Statement = [
       { Effect = "Allow", Action = ["s3:PutObject", "s3:GetObject", "s3:GetObjectVersion", "s3:GetBucketVersioning"], Resource = [aws_s3_bucket.ci_artifacts.arn, "${aws_s3_bucket.ci_artifacts.arn}/*"] },
-      { Effect = "Allow", Action = ["codebuild:BatchGetBuilds", "codebuild:StartBuild"], Resource = [aws_codebuild_project.docker.arn, aws_codebuild_project.tf_plan.arn, aws_codebuild_project.tf_apply.arn] }
+      { Effect = "Allow", Action = ["codebuild:BatchGetBuilds", "codebuild:StartBuild"], Resource = [aws_codebuild_project.lint.arn, aws_codebuild_project.docker.arn, aws_codebuild_project.tf_plan.arn, aws_codebuild_project.tf_apply.arn] }
     ]
   })
 }
@@ -190,6 +224,21 @@ resource "aws_codepipeline" "pipeline" {
       }
     }
   }
+  stage {
+    name = "Lint"
+    action {
+      name            = "Ruff"
+      category        = "Build"
+      owner           = "AWS"
+      provider        = "CodeBuild"
+      version         = "1"
+      input_artifacts = ["SourceArtifact"]
+      configuration = {
+        ProjectName = aws_codebuild_project.lint.name
+      }
+    }
+  }
+
 
   stage {
     name = "BuildDocker"

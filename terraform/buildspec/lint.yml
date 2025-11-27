@@ -1,0 +1,17 @@
+version: 0.2
+env:
+  variables:
+    AWS_DEFAULT_REGION: us-east-1
+phases:
+  install:
+    commands:
+      - echo Installing Ruff...
+      - python3 --version || python --version
+      - pip3 install --upgrade pip || pip install --upgrade pip
+      - pip3 install ruff || pip install ruff
+  build:
+    commands:
+      - echo Running Ruff lint and format checks...
+      - ruff --version
+      - ruff check .
+      - ruff format --check .
