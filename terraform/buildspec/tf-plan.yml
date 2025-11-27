@@ -28,7 +28,7 @@ phases:
       - IMAGE_TAGS=$(cat "$IMAGE_JSON")
       - cp "$IMAGE_JSON" ./images.json
       - TGR_TAG=$(echo $IMAGE_TAGS | jq -r '.textract_get_results')
-      - : "Using environment $TF_ENV"
+      - echo "Using environment $TF_ENV"
       - terraform -chdir=terraform/environments/$TF_ENV init -input=false
       - terraform -chdir=terraform/environments/$TF_ENV plan -out=tfplan -input=false -var="textract_get_results_tag=$TGR_TAG"
       - mkdir -p terraform
