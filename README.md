@@ -24,3 +24,12 @@ Local usage
 Notes
 - The legacy single-environment root at `terraform/` is now used as a module by the per-env roots.
 - ECR repos are now per env: `jury-app/textract-get-results-dev` and `jury-app/textract-get-results-prod`.
+
+Local Runner
+- Configure env vars with your outputs:
+  - Dev: set `JURY_DEV_API_URL` and `JURY_DEV_API_KEY`
+  - Prod: set `JURY_PROD_API_URL` and `JURY_PROD_API_KEY`
+- Run an example end-to-end via the live API:
+  - `python scripts/run_api_example.py one --env dev --api-url https://z8rj47cgo7.execute-api.us-east-1.amazonaws.com/dev --api-key <key>`
+  - Flags `--api-url` and `--api-key` are optional; they default to the provided dev values.
+  - Results are written to `runs/dev-one-<timestamp>/`
