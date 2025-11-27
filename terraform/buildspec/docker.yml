@@ -14,12 +14,12 @@ phases:
   build:
     commands:
       - echo Building Docker images...
-      - docker build -t jury-app/textract-get-results:$SHORT_SHA lambdas/textract_get_results
+      - docker build -t jury-app/textract-get-results-$TF_ENV:$SHORT_SHA lambdas/textract_get_results
   post_build:
     commands:
       - echo Tagging and pushing...
-      - docker tag jury-app/textract-get-results:$SHORT_SHA ${ACCOUNT_ID}.dkr.ecr.${AWS_DEFAULT_REGION}.amazonaws.com/jury-app/textract-get-results:$SHORT_SHA
-      - docker push ${ACCOUNT_ID}.dkr.ecr.${AWS_DEFAULT_REGION}.amazonaws.com/jury-app/textract-get-results:$SHORT_SHA
+      - docker tag jury-app/textract-get-results-$TF_ENV:$SHORT_SHA ${ACCOUNT_ID}.dkr.ecr.${AWS_DEFAULT_REGION}.amazonaws.com/jury-app/textract-get-results-$TF_ENV:$SHORT_SHA
+      - docker push ${ACCOUNT_ID}.dkr.ecr.${AWS_DEFAULT_REGION}.amazonaws.com/jury-app/textract-get-results-$TF_ENV:$SHORT_SHA
       - printf '{"textract_get_results":"%s"}' "$SHORT_SHA" > images.json
 artifacts:
   files:

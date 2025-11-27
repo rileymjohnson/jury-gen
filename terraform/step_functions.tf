@@ -1,5 +1,5 @@
 resource "aws_sfn_state_machine" "jury_app_workflow" {
-  name     = "JuryAppWorkflow"
+  name     = "JuryAppWorkflow-${var.environment}"
   role_arn = aws_iam_role.sfn_execution_role.arn
 
   definition = <<-EOF

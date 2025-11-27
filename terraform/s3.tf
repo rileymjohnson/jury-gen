@@ -1,6 +1,6 @@
 # 1. Bucket for users to upload their original documents
 resource "aws_s3_bucket" "uploads" {
-  bucket = "jury-app-uploads-${data.aws_caller_identity.current.account_id}"
+  bucket = "jury-app-uploads-${data.aws_caller_identity.current.account_id}${local.env_suffix}"
 }
 
 # CORS for browser uploads to presigned URLs
@@ -29,7 +29,7 @@ resource "aws_s3_bucket_public_access_block" "uploads_public_access" {
 
 # 2. Bucket for Textract to read from (and for our temp copies)
 resource "aws_s3_bucket" "processing" {
-  bucket = "jury-app-processing-${data.aws_caller_identity.current.account_id}"
+  bucket = "jury-app-processing-${data.aws_caller_identity.current.account_id}${local.env_suffix}"
 }
 
 # 2a. Block public access for the processing bucket
@@ -101,7 +101,7 @@ resource "aws_s3_bucket_server_side_encryption_configuration" "processing_sse" {
 
 # 3. (Optional) Bucket for large results
 resource "aws_s3_bucket" "results" {
-  bucket = "jury-app-results-${data.aws_caller_identity.current.account_id}"
+  bucket = "jury-app-results-${data.aws_caller_identity.current.account_id}${local.env_suffix}"
 }
 
 # 3a. Block public access for the results bucket

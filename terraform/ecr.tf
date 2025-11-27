@@ -1,5 +1,5 @@
 resource "aws_ecr_repository" "textract_get_results" {
-  name = "jury-app/textract-get-results" # Name for your container image
+  name = "jury-app/textract-get-results-${var.environment}" # Name for your container image
   
   image_tag_mutability = "MUTABLE"
 

@@ -1,0 +1,8 @@
+module "stack" {
+  source = "../.."
+
+  environment               = "dev"
+  ci_branch                 = "develop"
+  textract_get_results_tag  = var.textract_get_results_tag
+}
+

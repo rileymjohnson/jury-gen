@@ -74,7 +74,7 @@ data "archive_file" "api_status" {
 # --- Lambda Function Definitions ---
 
 resource "aws_lambda_function" "job_start" {
-  function_name    = "JuryApp-JobStart"
+  function_name    = "JuryApp-JobStart-${var.environment}"
   handler          = "main.lambda_handler"
   runtime          = "python3.12"
   role             = aws_iam_role.job_start.arn
@@ -90,7 +90,7 @@ resource "aws_lambda_function" "job_start" {
 }
 
 resource "aws_lambda_function" "textract_start" {
-  function_name    = "JuryApp-TextractStart"
+  function_name    = "JuryApp-TextractStart-${var.environment}"
   handler          = "main.lambda_handler"
   runtime          = "python3.12"
   role             = aws_iam_role.textract_start.arn
@@ -106,7 +106,7 @@ resource "aws_lambda_function" "textract_start" {
 }
 
 resource "aws_lambda_function" "textract_check_status" {
-  function_name    = "JuryApp-TextractCheckStatus"
+  function_name    = "JuryApp-TextractCheckStatus-${var.environment}"
   handler          = "main.lambda_handler"
   runtime          = "python3.12"
   role             = aws_iam_role.textract_check_status.arn
@@ -117,7 +117,7 @@ resource "aws_lambda_function" "textract_check_status" {
 
 # --- The Docker Lambda ---
 resource "aws_lambda_function" "textract_get_results" {
-  function_name = "JuryApp-TextractGetResults"
+  function_name = "JuryApp-TextractGetResults-${var.environment}"
   role          = aws_iam_role.textract_get_results.arn
   package_type  = "Image"
   timeout       = 300 # Textract paging and chunking can take time
@@ -129,7 +129,7 @@ resource "aws_lambda_function" "textract_get_results" {
 
 # --- Bedrock Lambdas ---
 resource "aws_lambda_function" "extract_legal_claims" {
-  function_name    = "JuryApp-ExtractLegalClaims"
+  function_name    = "JuryApp-ExtractLegalClaims-${var.environment}"
   handler          = "main.lambda_handler"
   runtime          = "python3.12"
   role             = aws_iam_role.extract_legal_claims.arn
@@ -145,7 +145,7 @@ resource "aws_lambda_function" "extract_legal_claims" {
 }
 
 resource "aws_lambda_function" "extract_witnesses" {
-  function_name    = "JuryApp-ExtractWitnesses"
+  function_name    = "JuryApp-ExtractWitnesses-${var.environment}"
   handler          = "main.lambda_handler"
   runtime          = "python3.12"
   role             = aws_iam_role.extract_witnesses.arn
@@ -155,7 +155,7 @@ resource "aws_lambda_function" "extract_witnesses" {
 }
 
 resource "aws_lambda_function" "extract_case_facts" {
-  function_name    = "JuryApp-ExtractCaseFacts"
+  function_name    = "JuryApp-ExtractCaseFacts-${var.environment}"
   handler          = "main.lambda_handler"
   runtime          = "python3.12"
   role             = aws_iam_role.extract_case_facts.arn
@@ -165,7 +165,7 @@ resource "aws_lambda_function" "extract_case_facts" {
 }
 
 resource "aws_lambda_function" "enrich_legal_item" {
-  function_name    = "JuryApp-EnrichLegalItem"
+  function_name    = "JuryApp-EnrichLegalItem-${var.environment}"
   handler          = "main.lambda_handler"
   runtime          = "python3.12"
   role             = aws_iam_role.enrich_legal_item.arn
@@ -175,7 +175,7 @@ resource "aws_lambda_function" "enrich_legal_item" {
 }
 
 resource "aws_lambda_function" "generate_instructions" {
-  function_name    = "JuryApp-GenerateInstructions"
+  function_name    = "JuryApp-GenerateInstructions-${var.environment}"
   handler          = "main.lambda_handler"
   runtime          = "python3.12"
   role             = aws_iam_role.generate_instructions.arn
@@ -193,7 +193,7 @@ resource "aws_lambda_function" "generate_instructions" {
 
 # --- Job Finish Lambdas ---
 resource "aws_lambda_function" "job_save_results" {
-  function_name    = "JuryApp-JobSaveResults"
+  function_name    = "JuryApp-JobSaveResults-${var.environment}"
   handler          = "main.lambda_handler"
   runtime          = "python3.12"
   role             = aws_iam_role.job_save_results.arn
@@ -209,7 +209,7 @@ resource "aws_lambda_function" "job_save_results" {
 }
 
 resource "aws_lambda_function" "job_handle_error" {
-  function_name    = "JuryApp-JobHandleError"
+  function_name    = "JuryApp-JobHandleError-${var.environment}"
   handler          = "main.lambda_handler"
   runtime          = "python3.12"
   role             = aws_iam_role.job_handle_error.arn
@@ -226,7 +226,7 @@ resource "aws_lambda_function" "job_handle_error" {
 
 # --- API Lambda Functions ---
 resource "aws_lambda_function" "api_signer" {
-  function_name    = "JuryApp-ApiSigner"
+  function_name    = "JuryApp-ApiSigner-${var.environment}"
   handler          = "main.lambda_handler"
   runtime          = "python3.12"
   role             = aws_iam_role.api_signer.arn
@@ -242,7 +242,7 @@ resource "aws_lambda_function" "api_signer" {
 }
 
 resource "aws_lambda_function" "api_start" {
-  function_name    = "JuryApp-ApiStart"
+  function_name    = "JuryApp-ApiStart-${var.environment}"
   handler          = "main.lambda_handler"
   runtime          = "python3.12"
   role             = aws_iam_role.api_start.arn
@@ -259,7 +259,7 @@ resource "aws_lambda_function" "api_start" {
 }
 
 resource "aws_lambda_function" "api_status" {
-  function_name    = "JuryApp-ApiStatus"
+  function_name    = "JuryApp-ApiStatus-${var.environment}"
   handler          = "main.lambda_handler"
   runtime          = "python3.12"
   role             = aws_iam_role.api_status.arn

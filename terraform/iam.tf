@@ -13,7 +13,7 @@ data "aws_iam_policy_document" "lambda_assume_role" {
 # --- API Lambdas IAM ---
 
 resource "aws_iam_role" "api_signer" {
-  name               = "ApiSignerLambdaRole"
+  name               = "ApiSignerLambdaRole${local.env_suffix}"
   assume_role_policy = data.aws_iam_policy_document.lambda_assume_role.json
 
   inline_policy {
@@ -36,7 +36,7 @@ resource "aws_iam_role_policy_attachment" "api_signer_logging" {
 }
 
 resource "aws_iam_role" "api_start" {
-  name               = "ApiStartLambdaRole"
+  name               = "ApiStartLambdaRole${local.env_suffix}"
   assume_role_policy = data.aws_iam_policy_document.lambda_assume_role.json
 
   inline_policy {
@@ -59,7 +59,7 @@ resource "aws_iam_role_policy_attachment" "api_start_logging" {
 }
 
 resource "aws_iam_role" "api_status" {
-  name               = "ApiStatusLambdaRole"
+  name               = "ApiStatusLambdaRole${local.env_suffix}"
   assume_role_policy = data.aws_iam_policy_document.lambda_assume_role.json
 
   inline_policy {
@@ -82,7 +82,7 @@ resource "aws_iam_role_policy_attachment" "api_status_logging" {
 }
 
 resource "aws_iam_policy" "lambda_basic_logging" {
-  name        = "LambdaBasicLoggingPolicy"
+  name        = "LambdaBasicLoggingPolicy${local.env_suffix}"
   description = "Allows Lambda to create and write to CloudWatch logs"
   policy = jsonencode({
     Version = "2012-10-17",
@@ -103,7 +103,7 @@ resource "aws_iam_policy" "lambda_basic_logging" {
 # --- 2. Roles for each Lambda ---
 
 resource "aws_iam_role" "job_start" {
-  name               = "JobStartLambdaRole"
+  name               = "JobStartLambdaRole${local.env_suffix}"
   assume_role_policy = data.aws_iam_policy_document.lambda_assume_role.json
 
   # Specific permissions for this Lambda
@@ -128,7 +128,7 @@ resource "aws_iam_role_policy_attachment" "job_start_logging" {
 
 
 resource "aws_iam_role" "textract_start" {
-  name               = "TextractStartLambdaRole"
+  name               = "TextractStartLambdaRole${local.env_suffix}"
   assume_role_policy = data.aws_iam_policy_document.lambda_assume_role.json
 
   inline_policy {
@@ -166,7 +166,7 @@ resource "aws_iam_role_policy_attachment" "textract_start_logging" {
 
 
 resource "aws_iam_role" "textract_check_status" {
-  name               = "TextractCheckStatusLambdaRole"
+  name               = "TextractCheckStatusLambdaRole${local.env_suffix}"
   assume_role_policy = data.aws_iam_policy_document.lambda_assume_role.json
 
   inline_policy {
@@ -190,7 +190,7 @@ resource "aws_iam_role_policy_attachment" "textract_check_status_logging" {
 
 
 resource "aws_iam_role" "textract_get_results" {
-  name               = "TextractGetResultsLambdaRole"
+  name               = "TextractGetResultsLambdaRole${local.env_suffix}"
   assume_role_policy = data.aws_iam_policy_document.lambda_assume_role.json
 
   inline_policy {
@@ -221,7 +221,7 @@ resource "aws_iam_role_policy_attachment" "textract_get_results_logging" {
 # --- Role for all Bedrock-using Lambdas ---
 # We can create ONE policy and attach it to multiple roles
 resource "aws_iam_policy" "bedrock_analyzer_policy" {
-  name = "BedrockAnalyzerPolicy"
+  name = "BedrockAnalyzerPolicy${local.env_suffix}"
   policy = jsonencode({
     Version = "2012-10-17",
     Statement = [
@@ -241,7 +241,7 @@ resource "aws_iam_policy" "bedrock_analyzer_policy" {
 
 # Role for extract_legal_claims
 resource "aws_iam_role" "extract_legal_claims" {
-  name               = "ExtractLegalClaimsLambdaRole"
+  name               = "ExtractLegalClaimsLambdaRole${local.env_suffix}"
   assume_role_policy = data.aws_iam_policy_document.lambda_assume_role.json
 }
 resource "aws_iam_role_policy_attachment" "extract_legal_claims_logging" {
@@ -255,7 +255,7 @@ resource "aws_iam_role_policy_attachment" "extract_legal_claims_bedrock" {
 
 # Role for extract_witnesses
 resource "aws_iam_role" "extract_witnesses" {
-  name               = "ExtractWitnessesLambdaRole"
+  name               = "ExtractWitnessesLambdaRole${local.env_suffix}"
   assume_role_policy = data.aws_iam_policy_document.lambda_assume_role.json
 }
 resource "aws_iam_role_policy_attachment" "extract_witnesses_logging" {
@@ -269,7 +269,7 @@ resource "aws_iam_role_policy_attachment" "extract_witnesses_bedrock" {
 
 # Role for extract_case_facts
 resource "aws_iam_role" "extract_case_facts" {
-  name               = "ExtractCaseFactsLambdaRole"
+  name               = "ExtractCaseFactsLambdaRole${local.env_suffix}"
   assume_role_policy = data.aws_iam_policy_document.lambda_assume_role.json
 }
 resource "aws_iam_role_policy_attachment" "extract_case_facts_logging" {
@@ -283,7 +283,7 @@ resource "aws_iam_role_policy_attachment" "extract_case_facts_bedrock" {
 
 # Role for enrich_legal_item
 resource "aws_iam_role" "enrich_legal_item" {
-  name               = "EnrichLegalItemLambdaRole"
+  name               = "EnrichLegalItemLambdaRole${local.env_suffix}"
   assume_role_policy = data.aws_iam_policy_document.lambda_assume_role.json
 }
 resource "aws_iam_role_policy_attachment" "enrich_legal_item_logging" {
@@ -297,7 +297,7 @@ resource "aws_iam_role_policy_attachment" "enrich_legal_item_bedrock" {
 
 # Role for generate_instructions
 resource "aws_iam_role" "generate_instructions" {
-  name               = "GenerateInstructionsLambdaRole"
+  name               = "GenerateInstructionsLambdaRole${local.env_suffix}"
   assume_role_policy = data.aws_iam_policy_document.lambda_assume_role.json
 }
 resource "aws_iam_role_policy_attachment" "generate_instructions_logging" {
@@ -312,7 +312,7 @@ resource "aws_iam_role_policy_attachment" "generate_instructions_bedrock" {
 
 # --- Roles for Job Finish ---
 resource "aws_iam_role" "job_save_results" {
-  name               = "JobSaveResultsLambdaRole"
+  name               = "JobSaveResultsLambdaRole${local.env_suffix}"
   assume_role_policy = data.aws_iam_policy_document.lambda_assume_role.json
 
   inline_policy {
@@ -340,7 +340,7 @@ resource "aws_iam_role_policy_attachment" "job_save_results_logging" {
 
 
 resource "aws_iam_role" "job_handle_error" {
-  name               = "JobHandleErrorLambdaRole"
+  name               = "JobHandleErrorLambdaRole${local.env_suffix}"
   assume_role_policy = data.aws_iam_policy_document.lambda_assume_role.json
 
   inline_policy {
@@ -377,7 +377,7 @@ data "aws_iam_policy_document" "sfn_assume_role" {
 }
 
 resource "aws_iam_role" "sfn_execution_role" {
-  name               = "JuryAppStepFunctionRole"
+  name               = "JuryAppStepFunctionRole${local.env_suffix}"
   assume_role_policy = data.aws_iam_policy_document.sfn_assume_role.json
 
   # Give it permission to invoke *all* our Lambdas

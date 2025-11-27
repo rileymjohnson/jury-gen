@@ -1,5 +1,5 @@
 resource "aws_api_gateway_rest_api" "jury_api" {
-  name        = "jury-app-api"
+  name        = "jury-app-api${local.env_suffix}"
   description = "API for signer, start, and status endpoints"
 }
 
@@ -113,24 +113,24 @@ resource "aws_api_gateway_deployment" "jury_api_deployment" {
   }
 }
 
-resource "aws_api_gateway_stage" "prod" {
+resource "aws_api_gateway_stage" "stage" {
   rest_api_id   = aws_api_gateway_rest_api.jury_api.id
   deployment_id = aws_api_gateway_deployment.jury_api_deployment.id
-  stage_name    = "prod"
+  stage_name    = var.environment
 }
 
 # API Key and Usage Plan
 resource "aws_api_gateway_api_key" "edge_key" {
-  name      = "jury-app-edge-key"
+  name      = "jury-app-edge-key${local.env_suffix}"
   enabled   = true
   value     = random_password.jury_api_key.result
 }
 
 resource "aws_api_gateway_usage_plan" "plan" {
-  name = "jury-app-plan"
+  name = "jury-app-plan${local.env_suffix}"
   api_stages {
     api_id = aws_api_gateway_rest_api.jury_api.id
-    stage  = aws_api_gateway_stage.prod.stage_name
+    stage  = aws_api_gateway_stage.stage.stage_name
   }
   throttle_settings {
     burst_limit = 50
@@ -168,4 +168,3 @@ resource "aws_lambda_permission" "allow_apigw_status" {
   principal     = "apigateway.amazonaws.com"
   source_arn    = "${aws_api_gateway_rest_api.jury_api.execution_arn}/*/*/jury/status/*"
 }
-

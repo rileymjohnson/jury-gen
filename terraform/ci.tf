@@ -1,5 +1,5 @@
 locals {
-  ci_bucket_name = "jury-gen-codepipeline-${data.aws_caller_identity.current.account_id}-${data.aws_region.current.name}"
+  ci_bucket_name = "jury-gen-codepipeline-${data.aws_caller_identity.current.account_id}-${data.aws_region.current.name}${local.env_suffix}"
 }
 
 resource "aws_s3_bucket" "ci_artifacts" {
@@ -30,17 +30,17 @@ resource "aws_s3_bucket_public_access_block" "ci_artifacts" {
 
 # CodeBuild IAM Roles
 resource "aws_iam_role" "cb_docker" {
-  name               = "JuryGen-CodeBuild-Docker"
+  name               = "JuryGen-CodeBuild-Docker${local.env_suffix}"
   assume_role_policy = jsonencode({ Version = "2012-10-17", Statement = [{ Effect = "Allow", Principal = { Service = "codebuild.amazonaws.com" }, Action = "sts:AssumeRole" }] })
 }
 
 
 resource "aws_iam_role" "cb_lint" {
-  name               = "JuryGen-CodeBuild-Lint"
+  name               = "JuryGen-CodeBuild-Lint${local.env_suffix}"
   assume_role_policy = jsonencode({ Version = "2012-10-17", Statement = [{ Effect = "Allow", Principal = { Service = "codebuild.amazonaws.com" }, Action = "sts:AssumeRole" }] })
 }
 resource "aws_iam_role_policy" "cb_docker" {
-  name   = "cb-docker-policy"
+  name   = "cb-docker-policy${local.env_suffix}"
   role   = aws_iam_role.cb_docker.id
   policy = jsonencode({
     Version = "2012-10-17",
@@ -56,7 +56,7 @@ resource "aws_iam_role_policy" "cb_docker" {
 
 
 resource "aws_iam_role_policy" "cb_lint" {
-  name   = "cb-lint-policy"
+  name   = "cb-lint-policy${local.env_suffix}"
   role   = aws_iam_role.cb_lint.id
   policy = jsonencode({
     Version = "2012-10-17",
@@ -68,7 +68,7 @@ resource "aws_iam_role_policy" "cb_lint" {
   })
 }
 resource "aws_codebuild_project" "docker" {
-  name         = "jury-gen-docker"
+  name         = "jury-gen-docker-${var.environment}"
   service_role = aws_iam_role.cb_docker.arn
   artifacts {
     type = "CODEPIPELINE"
@@ -82,6 +82,10 @@ resource "aws_codebuild_project" "docker" {
       name  = "ACCOUNT_ID"
       value = data.aws_caller_identity.current.account_id
     }
+    environment_variable {
+      name  = "TF_ENV"
+      value = var.environment
+    }
   }
   source {
     type      = "CODEPIPELINE"
@@ -94,12 +98,12 @@ resource "aws_codebuild_project" "docker" {
 }
 
 resource "aws_iam_role" "cb_tf" {
-  name               = "JuryGen-CodeBuild-Terraform"
+  name               = "JuryGen-CodeBuild-Terraform${local.env_suffix}"
   assume_role_policy = jsonencode({ Version = "2012-10-17", Statement = [{ Effect = "Allow", Principal = { Service = "codebuild.amazonaws.com" }, Action = "sts:AssumeRole" }] })
 }
 
 resource "aws_iam_role_policy" "cb_tf" {
-  name   = "cb-terraform-policy"
+  name   = "cb-terraform-policy${local.env_suffix}"
   role   = aws_iam_role.cb_tf.id
   policy = jsonencode({
     Version = "2012-10-17",
@@ -114,7 +118,7 @@ resource "aws_iam_role_policy" "cb_tf" {
 }
 
 resource "aws_codebuild_project" "lint" {
-  name         = "jury-gen-lint"
+  name         = "jury-gen-lint-${var.environment}"
   service_role = aws_iam_role.cb_lint.arn
   artifacts {
     type = "CODEPIPELINE"
@@ -130,7 +134,7 @@ resource "aws_codebuild_project" "lint" {
   }
 }
 resource "aws_codebuild_project" "tf_plan" {
-  name         = "jury-gen-tf-plan"
+  name         = "jury-gen-tf-plan-${var.environment}"
   service_role = aws_iam_role.cb_tf.arn
   artifacts {
     type = "CODEPIPELINE"
@@ -147,7 +151,7 @@ resource "aws_codebuild_project" "tf_plan" {
 }
 
 resource "aws_codebuild_project" "tf_apply" {
-  name         = "jury-gen-tf-apply"
+  name         = "jury-gen-tf-apply-${var.environment}"
   service_role = aws_iam_role.cb_tf.arn
   artifacts {
     type = "CODEPIPELINE"
@@ -165,12 +169,12 @@ resource "aws_codebuild_project" "tf_apply" {
 
 # CodePipeline IAM Role
 resource "aws_iam_role" "codepipeline" {
-  name               = "JuryGen-CodePipeline-Role"
+  name               = "JuryGen-CodePipeline-Role${local.env_suffix}"
   assume_role_policy = jsonencode({ Version = "2012-10-17", Statement = [{ Effect = "Allow", Principal = { Service = "codepipeline.amazonaws.com" }, Action = "sts:AssumeRole" }] })
 }
 
 resource "aws_iam_role_policy" "codepipeline" {
-  name   = "codepipeline-policy"
+  name   = "codepipeline-policy${local.env_suffix}"
   role   = aws_iam_role.codepipeline.id
   policy = jsonencode({
     Version = "2012-10-17",
@@ -183,12 +187,12 @@ resource "aws_iam_role_policy" "codepipeline" {
 
 # Create a CodeStar Connections connection (requires console authorization after creation)
 resource "aws_codestarconnections_connection" "github" {
-  name          = "jury-gen-github-connection"
+  name          = "jury-gen-github-connection${local.env_suffix}"
   provider_type = "GitHub"
 }
 
 resource "aws_iam_role_policy" "codepipeline_codestar" {
-  name   = "codepipeline-codestar-policy"
+  name   = "codepipeline-codestar-policy${local.env_suffix}"
   role   = aws_iam_role.codepipeline.id
   policy = jsonencode({
     Version = "2012-10-17",
@@ -199,7 +203,7 @@ resource "aws_iam_role_policy" "codepipeline_codestar" {
 }
 
 resource "aws_codepipeline" "pipeline" {
-  name     = "jury-gen-pipeline"
+  name     = "jury-gen-pipeline-${var.environment}"
   role_arn = aws_iam_role.codepipeline.arn
 
   artifact_store {
@@ -253,7 +257,8 @@ resource "aws_codepipeline" "pipeline" {
       configuration = {
         ProjectName = aws_codebuild_project.docker.name
         EnvironmentVariables = jsonencode([
-          { name = "ACCOUNT_ID", value = data.aws_caller_identity.current.account_id, type = "PLAINTEXT" }
+          { name = "ACCOUNT_ID", value = data.aws_caller_identity.current.account_id, type = "PLAINTEXT" },
+          { name = "TF_ENV", value = var.environment, type = "PLAINTEXT" }
         ])
       }
     }
@@ -272,6 +277,9 @@ resource "aws_codepipeline" "pipeline" {
       configuration = {
         ProjectName  = aws_codebuild_project.tf_plan.name
         PrimarySource = "SourceArtifact"
+        EnvironmentVariables = jsonencode([
+          { name = "TF_ENV", value = var.environment, type = "PLAINTEXT" }
+        ])
       }
     }
   }
@@ -288,6 +296,9 @@ resource "aws_codepipeline" "pipeline" {
       configuration = {
         ProjectName  = aws_codebuild_project.tf_apply.name
         PrimarySource = "SourceArtifact"
+        EnvironmentVariables = jsonencode([
+          { name = "TF_ENV", value = var.environment, type = "PLAINTEXT" }
+        ])
       }
     }
   }

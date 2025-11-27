@@ -16,8 +16,6 @@ variable "textract_get_results_tag" {
   default     = "latest"
 }
 
-// Removed defaulted ci_repository_id to avoid duplicates
-
 variable "ci_branch" {
   description = "Branch to build from"
   type        = string
@@ -40,4 +38,9 @@ variable "lock_table_name" {
   description = "DynamoDB table name for Terraform state locking (for CodeBuild access)"
   type        = string
   default     = "jury-gen-terraform-locks-196861676652-us-east-1"
+}
+
+variable "environment" {
+  description = "Deployment environment name (e.g., 'dev' or 'prod')"
+  type        = string
 }

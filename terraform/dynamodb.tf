@@ -1,5 +1,5 @@
 resource "aws_dynamodb_table" "jury_instructions" {
-  name         = "JuryInstructions"
+  name         = "JuryInstructions${local.env_suffix}"
   billing_mode = "PAY_PER_REQUEST"
   hash_key     = "jury_instruction_id"
 
@@ -11,7 +11,7 @@ resource "aws_dynamodb_table" "jury_instructions" {
 
 # Standard reference data: Claims
 resource "aws_dynamodb_table" "claims" {
-  name         = "Claims"
+  name         = "Claims${local.env_suffix}"
   billing_mode = "PAY_PER_REQUEST"
   hash_key     = "id"
 
@@ -23,7 +23,7 @@ resource "aws_dynamodb_table" "claims" {
 
 # Standard reference data: Standard Jury Instructions
 resource "aws_dynamodb_table" "standard_jury_instructions" {
-  name         = "StandardJuryInstructions"
+  name         = "StandardJuryInstructions${local.env_suffix}"
   billing_mode = "PAY_PER_REQUEST"
   hash_key     = "id"
 
