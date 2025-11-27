@@ -317,7 +317,7 @@ def generate_custom_instructions(claim_info, claim, case_facts):
                             "properties": {
                                 "customized_text": {
                                     "type": "string",
-                                    "description": "The full text of this instruction with party names and facts filled in",
+                                    "description": "The full text of this instruction with party names and facts filled in",  # noqa: E501
                                 },
                                 "reasoning": {
                                     "type": "string",

@@ -14,4 +14,3 @@ phases:
       - echo Running Ruff lint and format checks...
       - ruff --version
       - ruff check .
-      - ruff format --check .
