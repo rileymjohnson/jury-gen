@@ -15,25 +15,7 @@ dependencies = []
 [tool.uv]
 package = false
 
-[tool.uv.scripts]
-# Open the local web UI
-ui = "streamlit run scripts/ui_app.py"
-
-# Generic CLI runner; pass args after --
-# Example: uv run lambda -- --lambda extract_legal_claims --example one --region us-east-1
-lambda = "python scripts/run_lambda_local.py"
-
-# Build input payloads from Step Functions history (examples/one)
-extract-one = "python scripts/extract_lambda_inputs.py --history examples/one/sfn_events.json --lambdas enrich_legal_item extract_case_facts extract_legal_claims extract_witnesses generate_instructions --outdir examples/one/inputs --write-files"
-
-# Build input payloads from Step Functions history (examples/two)
-extract-two = "python scripts/extract_lambda_inputs.py --history examples/two/sfn_events.json --lambdas enrich_legal_item extract_case_facts extract_legal_claims extract_witnesses generate_instructions --outdir examples/two/inputs --write-files"
-
-[project.optional-dependencies]
-dev = [
-  "ruff>=0.6.9",
-  "requests>=2.32.3",
-]
+## Removed optional "dev" extras in favor of uv dependency groups
 
 [tool.ruff]
 line-length = 120
@@ -63,4 +45,6 @@ line-ending = "auto"
 dev = [
     "boto3>=1.41.5",
     "streamlit>=1.51.0",
+    "ruff>=0.6.9",
+    "requests>=2.32.3",
 ]

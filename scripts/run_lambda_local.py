@@ -1,14 +1,9 @@
-#!/usr/bin/env python3
-from __future__ import annotations
-
 import argparse
-import os
-import importlib
+from collections.abc import Callable
 import json
-import sys
+import os
 from pathlib import Path
-from typing import Callable, Iterable, List, Tuple
-
+import sys
 
 LAMBDA_DIR_MAP = {
     "enrich_legal_item": "enrich_legal_item",
@@ -90,7 +85,7 @@ def ensure_inputs(lambda_name: str, example: str) -> Path:
     )
 
 
-def maybe_auto_extract(lambda_names: List[str], example: str) -> None:
+def maybe_auto_extract(lambda_names: list[str], example: str) -> None:
     history = Path("examples") / example / "sfn_events.json"
     outdir = Path("examples") / example / "inputs"
     if not history.exists():
@@ -139,7 +134,7 @@ def maybe_auto_extract(lambda_names: List[str], example: str) -> None:
             sys.path.remove(str(Path("scripts").resolve()))
 
 
-def resolve_handler(lambda_name: str) -> Tuple[Callable, Path]:
+def resolve_handler(lambda_name: str) -> tuple[Callable, Path]:
     lambda_subdir = LAMBDA_DIR_MAP[lambda_name]
     lambda_dir = Path("lambdas") / lambda_subdir
     if not lambda_dir.exists():
@@ -150,10 +145,29 @@ def resolve_handler(lambda_name: str) -> Tuple[Callable, Path]:
     if lambda_path not in sys.path:
         sys.path.insert(0, lambda_path)
 
+    # Dev hot-reload: purge previously loaded modules from this lambda folder
+    try:
+        lambda_root = lambda_dir.resolve()
+        to_delete = []
+        for name, mod in list(sys.modules.items()):
+            f = getattr(mod, "__file__", None)
+            if not f:
+                continue
+            try:
+                p = Path(f).resolve()
+                if str(p).startswith(str(lambda_root)):
+                    to_delete.append(name)
+            except Exception:
+                continue
+        for name in to_delete:
+            sys.modules.pop(name, None)
+    except Exception:
+        pass
+
     # Load the exact main.py for this lambda under a unique module name to avoid cache collisions
     module_name = f"lambda_{lambda_name}_main"
     try:
-        from importlib.util import spec_from_file_location, module_from_spec
+        from importlib.util import module_from_spec, spec_from_file_location
 
         main_py = lambda_dir / "main.py"
         spec = spec_from_file_location(module_name, main_py)
@@ -174,7 +188,7 @@ def resolve_handler(lambda_name: str) -> Tuple[Callable, Path]:
     return module.lambda_handler, lambda_dir
 
 
-def collect_input_files(lambda_name: str, example: str, ensure: bool, default_all: bool) -> List[Path]:
+def collect_input_files(lambda_name: str, example: str, ensure: bool, default_all: bool) -> list[Path]:
     inputs_dir = Path("examples") / example / "inputs"
     if ensure and not (inputs_dir.exists() and any(inputs_dir.glob(f"{lambda_name}-*.json"))):
         # Try auto-extract
@@ -187,7 +201,7 @@ def collect_input_files(lambda_name: str, example: str, ensure: bool, default_al
     return files
 
 
-def main() -> None:
+def main() -> None:  # noqa: PLR0912, PLR0915
     args = parse_args()
 
     default_all = args.lambda_name == "enrich_legal_item"
@@ -211,7 +225,7 @@ def main() -> None:
                 if ev.get("type") == "LambdaFunctionScheduled":
                     arn = (ev.get("lambdaFunctionScheduledEventDetails") or {}).get("resource") or ""
                     parts = arn.split(":")  # arn:aws:lambda:<region>:
-                    if len(parts) > 3 and parts[2] == "lambda":
+                    if len(parts) > 3 and parts[2] == "lambda":  # noqa: PLR2004
                         region = parts[3]
                         break
             if region:

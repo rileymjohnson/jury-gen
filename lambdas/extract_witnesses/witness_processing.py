@@ -90,10 +90,7 @@ Return all individual witnesses found.""",
 
     # Handle different body types (StreamingBody, bytes, str)
     body_obj = response.get("body")
-    if hasattr(body_obj, "read"):
-        raw = body_obj.read()
-    else:
-        raw = body_obj
+    raw = body_obj.read() if hasattr(body_obj, "read") else body_obj
     if isinstance(raw, bytes):
         raw = raw.decode("utf-8", errors="replace")
 
