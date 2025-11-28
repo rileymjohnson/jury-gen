@@ -1,9 +1,12 @@
 import argparse
 from collections.abc import Callable
+from importlib.util import module_from_spec, spec_from_file_location
 import json
 import os
 from pathlib import Path
 import sys
+
+import extract_lambda_inputs as extractor
 
 LAMBDA_DIR_MAP = {
     "enrich_legal_item": "enrich_legal_item",
@@ -94,8 +97,6 @@ def maybe_auto_extract(lambda_names: list[str], example: str) -> None:
     # Invoke the extractor as a module to avoid subprocess on Windows/WSL issues
     sys.path.insert(0, str(Path("scripts").resolve()))
     try:
-        import extract_lambda_inputs as extractor  # type: ignore
-
         class Args:
             history = str(history)
             lambdas = lambda_names
@@ -167,8 +168,6 @@ def resolve_handler(lambda_name: str) -> tuple[Callable, Path]:
     # Load the exact main.py for this lambda under a unique module name to avoid cache collisions
     module_name = f"lambda_{lambda_name}_main"
     try:
-        from importlib.util import module_from_spec, spec_from_file_location
-
         main_py = lambda_dir / "main.py"
         spec = spec_from_file_location(module_name, main_py)
         if spec is None or spec.loader is None:

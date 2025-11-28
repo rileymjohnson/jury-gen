@@ -1,8 +1,15 @@
 import contextlib
+from contextlib import redirect_stderr, redirect_stdout
+from importlib.util import module_from_spec, spec_from_file_location
+from io import StringIO
 import json
+import logging
 import os
 from pathlib import Path
+import queue
 import sys
+import threading
+import time
 
 import streamlit as st
 
@@ -70,8 +77,6 @@ def resolve_handler(lambda_name: str) -> tuple[callable, Path]:
     except Exception:
         pass
     try:
-        from importlib.util import module_from_spec, spec_from_file_location
-
         main_py = lambda_dir / "main.py"
         module_name = f"lambda_{lambda_name}_main"
         spec = spec_from_file_location(module_name, main_py)
@@ -108,10 +113,6 @@ def run_single(lambda_name: str, payload):
 
 def run_with_logs(lambda_name: str, payload):
     """Run the lambda and capture logs/stdio output. Returns (result, logs_text)."""
-    from contextlib import redirect_stderr, redirect_stdout
-    from io import StringIO
-    import logging
-
     handler, _ = resolve_handler(lambda_name)
 
     log_buf = StringIO()
@@ -146,12 +147,6 @@ def run_with_live_logs(lambda_name: str, payload, log_placeholder, logs_key: str
 
     Returns the handler result (or raises the handler's exception).
     """
-    from contextlib import redirect_stderr, redirect_stdout
-    import logging
-    import queue
-    import threading
-    import time
-
     handler, _ = resolve_handler(lambda_name)
 
     q: queue.Queue[str] = queue.Queue()
