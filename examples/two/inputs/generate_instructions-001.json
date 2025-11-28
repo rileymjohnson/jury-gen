@@ -1,0 +1,433 @@
+{
+  "case_facts": "The case involved Millin A. Nobregas (plaintiff) and Virginia Hadad Gonzalez (defendant). From approximately May 2007 through June 2008, Nobregas attended weekly mental health counseling sessions with Gonzalez at her home, paying $60 per session. Gonzalez claimed to have a medical doctorate degree and provided counseling services to Nobregas, who was an attorney and sought counseling on the recommendation of a mutual friend and his ex-girlfriend. Documentation from the Florida Department of Health later issued a Cease and Desist notice to Gonzalez on August 8, 2013, and the Florida Certification Board's records were requested as part of the proceedings.\n\nThe relationship became contentious when Gonzalez began counseling Nobregas's ex-girlfriend, Veronica Fazzio, who was the mother of his child. Nobregas alleged that Gonzalez disclosed confidential information from his counseling sessions, while Gonzalez maintained that any information she received either came from third parties or was disclosed in the presence of others. In July 2012, Gonzalez filed a child abuse complaint against Nobregas with the Florida Department of Children and Families, which was dismissed. She also filed a Florida Bar complaint against him alleging assault after her deposition, which was also dismissed.\n\nNobregas sued Gonzalez for fraud, breach of fiduciary duty, invasion of privacy, negligence, and violation of Florida's Deceptive and Unfair Trade Practices Act. He sought damages for emotional distress, damage to his reputation, interference with his parental rights, and legal defense costs. Medical experts, including Dr. Mark Barnett (psychiatrist) and Dr. Adriana Rosen (Ph.D.), were prepared to testify about Nobregas's mental condition and how Gonzalez's actions caused and aggravated his condition, including the need for new medication. Gonzalez denied most allegations in her answer and raised multiple affirmative defenses, including that Nobregas had given permission to disclose information, that she was privileged to make any alleged disclosures, and that Nobregas's claims should be barred due to unclean hands.",
+  "counterclaims": [],
+  "claims": [
+    {
+      "claim_id": "24f43d97-d402-41fd-8989-e4e032ed7c28",
+      "raw_texts": [
+        "COUNT I - ACTION FOR SEVERE INFLICTION OF EMOTIONAL DISTRESS"
+      ],
+      "damages": {
+        "compensatory": [
+          "damages greater than $15,000.00 exclusive of interest, attorney fees and costs",
+          "monetary damages",
+          "damages from privacy breach and disclosure of confidential information",
+          "damages for mental pain",
+          "damages for increased anxiety, mental anguish, and pain and suffering",
+          "damages from defending ongoing paternity action",
+          "loss of monies paid to defendant for counseling services",
+          "actual damages"
+        ],
+        "punitive": [
+          "punitive damages"
+        ],
+        "statutory": [
+          "damages under Florida Deceptive and Unfair Trade Practices Act (FDUTPA)"
+        ],
+        "equitable": [
+          "equitable relief",
+          "declaratory judgment that defendant violated FDUTPA",
+          "injunction enjoining future violations of FDUTPA"
+        ],
+        "other": [
+          "costs",
+          "attorney's fees",
+          "such other relief that the Court deems just and proper"
+        ]
+      },
+      "defenses": [
+        {
+          "name": "Failure to Meet Conditions Precedent",
+          "raw_text": "FIRST AFFIRMATIVE DEFENSE - Plaintiff has failed to meet all conditions precedent in bringing these actions. As such, the Plaintiff's action is barred."
+        },
+        {
+          "name": "Waiver of Confidentiality",
+          "raw_text": "SECOND AFFIRMATIVE DEFENSE - Plaintiff shared information with third parties, including the mother of Plaintiff's child and Plaintiff's girlfriend, therefore he waived any right to confidentiality. As a result, Plaintiff's claims are barred."
+        },
+        {
+          "name": "Qualified Immunity",
+          "raw_text": "THIRD AFFIRMATIVE DEFENSE - Any disclosures of confidential information made by Defendant were made with qualified immunity because it is permissible to disclose information to protect a child or for a bar complaint. As a result, Plaintiff's claims are barred."
+        },
+        {
+          "name": "Privileged Communication",
+          "raw_text": "FOURTH AFFIRMATIVE DEFENSE - Defendant was privileged to make any alleged disclosures. As a result, Plaintiff's claims are barred."
+        },
+        {
+          "name": "Unclean Hands",
+          "raw_text": "FIFTH AFFIRMATIVE DEFENSE - Plaintiff cannot seek damages or equity because the Plaintiff comes to the Court with unclean hands. As a result, Plaintiff's claims are barred."
+        },
+        {
+          "name": "Justification",
+          "raw_text": "SIXTH AFFIRMATIVE DEFENSE - Defendant was justified in making any alleged disclosures. As a result, Plaintiff's claims are barred."
+        },
+        {
+          "name": "No Confidential Information",
+          "raw_text": "EIGHTH AFFIRMATIVE DEFENSE - Defendant never received any confidential information from Plaintiff. Therefore, Plaintiff's claims ought to be barred."
+        },
+        {
+          "name": "Consent to Disclosure",
+          "raw_text": "NINTH AFFIRMATIVE DEFENSE - Plaintiff gave Defendant permission to disclose confidential information. Therefore, Plaintiff's claims ought to be barred."
+        }
+      ]
+    },
+    {
+      "claim_id": "3f097ead-55eb-4045-a6d6-85c4deee37b0",
+      "raw_texts": [
+        "COUNT II- ACTION FOR FRAUD OR FRAUDULENT MISREPRESENTATION"
+      ],
+      "damages": {
+        "compensatory": [
+          "monetary damages for FDUTPA violation",
+          "damages for increased anxiety, mental anguish, and pain and suffering",
+          "damages for mental pain, disturbance of peace of mind and privacy",
+          "damages greater than $15,000.00 exclusive of interest, attorney fees and costs",
+          "actual damages for FDUTPA violation",
+          "lost monies paid to defendant for counseling services"
+        ],
+        "punitive": [
+          "punitive damages"
+        ],
+        "statutory": [
+          "damages under Florida Deceptive and Unfair Trade Practices Act (FDUTPA)"
+        ],
+        "equitable": [
+          "injunction enjoining future violations of FDUTPA",
+          "declaratory judgment that defendant violated FDUTPA"
+        ],
+        "other": [
+          "attorney's fees and costs",
+          "trial by jury on all issues",
+          "such other relief that the Court deems just and proper",
+          "attorney's fees and costs under F.S. 501.211(2) and 501.2105"
+        ]
+      },
+      "defenses": [
+        {
+          "name": "Failure to Meet Conditions Precedent",
+          "raw_text": "FIRST AFFIRMATIVE DEFENSE - Plaintiff has failed to meet all conditions precedent in bringing these actions. As such, the Plaintiff's action is barred."
+        },
+        {
+          "name": "Waiver of Confidentiality",
+          "raw_text": "SECOND AFFIRMATIVE DEFENSE - Plaintiff shared information with third parties, including the mother of Plaintiff's child and Plaintiff's girlfriend, therefore he waived any right to confidentiality. As a result, Plaintiff's claims are barred."
+        },
+        {
+          "name": "Qualified Immunity",
+          "raw_text": "THIRD AFFIRMATIVE DEFENSE - Any disclosures of confidential information made by Defendant were made with qualified immunity because it is permissible to disclose information to protect a child or for a bar complaint. As a result, Plaintiff's claims are barred."
+        },
+        {
+          "name": "Privilege",
+          "raw_text": "FOURTH AFFIRMATIVE DEFENSE - Defendant was privileged to make any alleged disclosures. As a result, Plaintiff's claims are barred."
+        },
+        {
+          "name": "Unclean Hands",
+          "raw_text": "FIFTH AFFIRMATIVE DEFENSE - Plaintiff cannot seek damages or equity because the Plaintiff comes to the Court with unclean hands. As a result, Plaintiff's claims are barred."
+        },
+        {
+          "name": "Justification",
+          "raw_text": "SIXTH AFFIRMATIVE DEFENSE - Defendant was justified in making any alleged disclosures. As a result, Plaintiff's claims are barred."
+        },
+        {
+          "name": "No Confidentiality - Third Party Information",
+          "raw_text": "SECOND AFFIRMATIVE DEFENSE - Defendant received information from third parties, including the mother of Plaintiff's child and Plaintiff's girlfriend, therefore it is not confidential. As a result, Plaintiff's claims are barred."
+        }
+      ]
+    },
+    {
+      "claim_id": "b7669add-e694-4dc2-9416-20c9eeb44b56",
+      "raw_texts": [
+        "COUNT III- ACTION FOR CONSTRUCTIVE FRAUD OR FRAUD IN THE CONCEALMENT"
+      ],
+      "damages": {
+        "compensatory": [
+          "Money paid for counseling sessions ($60 per session for ~2 years)",
+          "Pain and suffering",
+          "Damages for privacy violation",
+          "Damages from ongoing paternity action defense",
+          "Compensatory damages (unspecified amount)",
+          "Actual damages under FDUTPA",
+          "Mental anguish damages"
+        ],
+        "punitive": [
+          "Punitive damages"
+        ],
+        "statutory": [],
+        "equitable": [
+          "Declaratory judgment that defendant violated FDUTPA",
+          "Injunction enjoining future violations of FDUTPA"
+        ],
+        "other": [
+          "Attorney's fees",
+          "Legal costs",
+          "Such other relief as the Court deems proper"
+        ]
+      },
+      "defenses": [
+        {
+          "name": "Failure to Meet Conditions Precedent",
+          "raw_text": "FIRST AFFIRMATIVE DEFENSE - Plaintiff has failed to meet all conditions precedent in bringing these actions. As such, the Plaintiff's action is barred."
+        },
+        {
+          "name": "Waiver of Confidentiality",
+          "raw_text": "SECOND AFFIRMATIVE DEFENSE - Plaintiff shared information with third parties, including the mother of Plaintiff's child and Plaintiff's girlfriend, therefore he waived any right to confidentiality. As a result, Plaintiff's claims are barred."
+        },
+        {
+          "name": "Qualified Immunity",
+          "raw_text": "THIRD AFFIRMATIVE DEFENSE - Any disclosures of confidential information made by Defendant were made with qualified immunity because it is permissible to disclose information to protect a child or for a bar complaint. As a result, Plaintiff's claims are barred."
+        },
+        {
+          "name": "Privilege and Justification",
+          "raw_text": "FOURTH AFFIRMATIVE DEFENSE - Defendant was privileged to make any alleged disclosures. As a result, Plaintiff's claims are barred."
+        },
+        {
+          "name": "Unclean Hands",
+          "raw_text": "FIFTH AFFIRMATIVE DEFENSE - Plaintiff cannot seek damages or equity because the Plaintiff comes to the Court with unclean hands. As a result, Plaintiff's claims are barred."
+        },
+        {
+          "name": "No Duty of Confidentiality",
+          "raw_text": "SEVENTH AFFIRMATIVE DEFENSE - Defendant's duty of confidentiality did not extend to third parties who were present during Plaintiff's disclosure. As a result, Plaintiff's claims are barred."
+        },
+        {
+          "name": "No Confidential Information",
+          "raw_text": "EIGHTH AFFIRMATIVE DEFENSE - Defendant never received any confidential information from Plaintiff. Therefore, Plaintiff's claims ought to be barred."
+        },
+        {
+          "name": "Consent to Disclosure",
+          "raw_text": "NINTH AFFIRMATIVE DEFENSE - Plaintiff gave Defendant permission to disclose confidential information. Therefore, Plaintiff's claims ought to be barred."
+        }
+      ]
+    },
+    {
+      "claim_id": "4632acc7-ced8-4e38-a381-87b047a61ef4",
+      "raw_texts": [
+        "COUNT IV-ACTION FOR VIOLATION OF THE FLA. DECEPTIVE AND UNFAIR TRADE PRACTICES ACT, SECTION 501.204"
+      ],
+      "damages": {
+        "compensatory": [
+          "actual damages under FDUTPA",
+          "damages greater than $15,000.00",
+          "monetary damages under FDUTPA"
+        ],
+        "punitive": [
+          "punitive damages"
+        ],
+        "statutory": [
+          "damages under Florida Deceptive and Unfair Trade Practices Act (FDUTPA)"
+        ],
+        "equitable": [
+          "declaratory judgment that defendant violated FDUTPA",
+          "injunction enjoining future violations of FDUTPA"
+        ],
+        "other": [
+          "such other relief that the Court deems just and proper",
+          "attorney's fees and costs pursuant to F.S. 501.211(2) and 501.2105"
+        ]
+      },
+      "defenses": [
+        {
+          "name": "Failure to Meet Conditions Precedent",
+          "raw_text": "FIRST AFFIRMATIVE DEFENSE - Plaintiff has failed to meet all conditions precedent in bringing these actions. As such, the Plaintiff's action is barred."
+        },
+        {
+          "name": "Waiver of Confidentiality",
+          "raw_text": "SECOND AFFIRMATIVE DEFENSE - Plaintiff shared information with third parties, including the mother of Plaintiff's child and Plaintiff's girlfriend, therefore he waived any right to confidentiality. As a result, Plaintiff's claims are barred."
+        },
+        {
+          "name": "Qualified Immunity",
+          "raw_text": "THIRD AFFIRMATIVE DEFENSE - Any disclosures of confidential information made by Defendant were made with qualified immunity because it is permissible to disclose information to protect a child or for a bar complaint. As a result, Plaintiff's claims are barred."
+        },
+        {
+          "name": "Privilege",
+          "raw_text": "FOURTH AFFIRMATIVE DEFENSE - Defendant was privileged to make any alleged disclosures. As a result, Plaintiff's claims are barred."
+        },
+        {
+          "name": "Unclean Hands",
+          "raw_text": "FIFTH AFFIRMATIVE DEFENSE - Plaintiff cannot seek damages or equity because the Plaintiff comes to the Court with unclean hands. As a result, Plaintiff's claims are barred."
+        },
+        {
+          "name": "Justification",
+          "raw_text": "SIXTH AFFIRMATIVE DEFENSE - Defendant was justified in making any alleged disclosures. As a result, Plaintiff's claims are barred."
+        },
+        {
+          "name": "No Duty of Confidentiality",
+          "raw_text": "SEVENTH AFFIRMATIVE DEFENSE - Defendant's duty of confidentiality did not extend to third parties who were present during Plaintiff's disclosure. As a result, Plaintiff's claims are barred."
+        },
+        {
+          "name": "Consent to Disclosure",
+          "raw_text": "NINTH AFFIRMATIVE DEFENSE - Plaintiff gave Defendant permission to disclose confidential information. Therefore, Plaintiff's claims ought to be barred."
+        }
+      ]
+    },
+    {
+      "claim_id": "cded4027-6867-49fa-bd52-8f80d323d060",
+      "raw_texts": [
+        "COUNT V - ACTION FOR INVASION OF PRIVACY"
+      ],
+      "damages": {
+        "compensatory": [
+          "damages for peace of mind and privacy disturbance",
+          "damages for increased anxiety and mental anguish",
+          "damages for being subjected to contempt and ridicule",
+          "damages for reputation damage as lawyer",
+          "damages for injury to personality being violated",
+          "damages for pain and suffering",
+          "damages for mental pain"
+        ],
+        "punitive": [
+          "punitive damages"
+        ],
+        "statutory": [],
+        "equitable": [],
+        "other": [
+          "costs",
+          "attorney's fees",
+          "all other relief court deems proper"
+        ]
+      },
+      "defenses": [
+        {
+          "name": "Failure to Meet Conditions Precedent",
+          "raw_text": "FIRST AFFIRMATIVE DEFENSE - Plaintiff has failed to meet all conditions precedent in bringing these actions. As such, the Plaintiff's action is barred."
+        },
+        {
+          "name": "Waiver of Confidentiality",
+          "raw_text": "SECOND AFFIRMATIVE DEFENSE - Plaintiff shared information with third parties, including the mother of Plaintiff's child and Plaintiff's girlfriend, therefore he waived any right to confidentiality. As a result, Plaintiff's claims are barred."
+        },
+        {
+          "name": "Qualified Immunity",
+          "raw_text": "THIRD AFFIRMATIVE DEFENSE - Any disclosures of confidential information made by Defendant were made with qualified immunity because it is permissible to disclose information to protect a child or for a bar complaint. As a result, Plaintiff's claims are barred."
+        },
+        {
+          "name": "Privilege and Justification",
+          "raw_text": "FOURTH AFFIRMATIVE DEFENSE - Defendant was privileged to make any alleged disclosures. As a result, Plaintiff's claims are barred."
+        },
+        {
+          "name": "Unclean Hands",
+          "raw_text": "FIFTH AFFIRMATIVE DEFENSE - Plaintiff cannot seek damages or equity because the Plaintiff comes to the Court with unclean hands. As a result, Plaintiff's claims are barred."
+        },
+        {
+          "name": "No Duty of Confidentiality",
+          "raw_text": "SEVENTH AFFIRMATIVE DEFENSE - Defendant's duty of confidentiality did not extend to third parties who were present during Plaintiff's disclosure. As a result, Plaintiff's claims are barred."
+        },
+        {
+          "name": "No Confidential Information",
+          "raw_text": "EIGHTH AFFIRMATIVE DEFENSE - Defendant never received any confidential information from Plaintiff. Therefore, Plaintiff's claims ought to be barred."
+        },
+        {
+          "name": "Consent to Disclosure",
+          "raw_text": "NINTH AFFIRMATIVE DEFENSE - Plaintiff gave Defendant permission to disclose confidential information. Therefore, Plaintiff's claims ought to be barred."
+        }
+      ]
+    },
+    {
+      "claim_id": "6c6ddb28-66ae-4ef4-9d1f-b5676ddf253c",
+      "raw_texts": [
+        "COUNT VI - ACTION FOR NEGLIGENCE"
+      ],
+      "damages": {
+        "compensatory": [
+          "damages for pain and suffering",
+          "damages for having to defend himself in ongoing paternity action",
+          "damages for mental anguish",
+          "damages for increased anxiety"
+        ],
+        "punitive": [
+          "punitive damages"
+        ],
+        "statutory": [],
+        "equitable": [],
+        "other": [
+          "costs",
+          "attorney's fees",
+          "all other relief the Court deems proper"
+        ]
+      },
+      "defenses": [
+        {
+          "name": "Failure to Meet Conditions Precedent",
+          "raw_text": "FIRST AFFIRMATIVE DEFENSE - Plaintiff has failed to meet all conditions precedent in bringing these actions. As such, the Plaintiff's action is barred."
+        },
+        {
+          "name": "Waiver of Confidentiality",
+          "raw_text": "SECOND AFFIRMATIVE DEFENSE - Plaintiff shared information with third parties, including the mother of Plaintiff's child and Plaintiff's girlfriend, therefore he waived any right to confidentiality. As a result, Plaintiff's claims are barred."
+        },
+        {
+          "name": "Qualified Immunity",
+          "raw_text": "THIRD AFFIRMATIVE DEFENSE - Any disclosures of confidential information made by Defendant were made with qualified immunity because it is permissible to disclose information to protect a child or for a bar complaint. As a result, Plaintiff's claims are barred."
+        },
+        {
+          "name": "Privileged Disclosure",
+          "raw_text": "FOURTH AFFIRMATIVE DEFENSE - Defendant was privileged to make any alleged disclosures. As a result, Plaintiff's claims are barred."
+        },
+        {
+          "name": "Unclean Hands",
+          "raw_text": "FIFTH AFFIRMATIVE DEFENSE - Plaintiff cannot seek damages or equity because the Plaintiff comes to the Court with unclean hands. As a result, Plaintiff's claims are barred."
+        },
+        {
+          "name": "No Confidential Information",
+          "raw_text": "EIGHTH AFFIRMATIVE DEFENSE - Defendant never received any confidential information from Plaintiff. Therefore, Plaintiff's claims ought to be barred."
+        },
+        {
+          "name": "Consent to Disclosure",
+          "raw_text": "NINTH AFFIRMATIVE DEFENSE - Plaintiff gave Defendant permission to disclose confidential information. Therefore, Plaintiff's claims ought to be barred."
+        }
+      ]
+    },
+    {
+      "claim_id": "9e3b8d10-5fee-423c-b275-3f3b1e7af895",
+      "raw_texts": [
+        "COUNT VII - ACTION FOR BREACH OF FIDUCIARY DUTY"
+      ],
+      "damages": {
+        "compensatory": [
+          "damages from breach of confidential relationship",
+          "damages from suffering due to revealed confidences",
+          "compensatory damages"
+        ],
+        "punitive": [
+          "punitive damages"
+        ],
+        "statutory": [],
+        "equitable": [],
+        "other": [
+          "all other relief court deems proper",
+          "costs",
+          "attorney's fees"
+        ]
+      },
+      "defenses": [
+        {
+          "name": "Failure to Meet Conditions Precedent",
+          "raw_text": "FIRST AFFIRMATIVE DEFENSE - Plaintiff has failed to meet all conditions precedent in bringing these actions. As such, the Plaintiff's action is barred."
+        },
+        {
+          "name": "Waiver of Confidentiality",
+          "raw_text": "SECOND AFFIRMATIVE DEFENSE - Plaintiff shared information with third parties, including the mother of Plaintiff's child and Plaintiff's girlfriend, therefore he waived any right to confidentiality. As a result, Plaintiff's claims are barred."
+        },
+        {
+          "name": "Qualified Immunity",
+          "raw_text": "THIRD AFFIRMATIVE DEFENSE - Any disclosures of confidential information made by Defendant were made with qualified immunity because it is permissible to disclose information to protect a child or for a bar complaint. As a result, Plaintiff's claims are barred."
+        },
+        {
+          "name": "Privileged Disclosure",
+          "raw_text": "FOURTH AFFIRMATIVE DEFENSE - Defendant was privileged to make any alleged disclosures. As a result, Plaintiff's claims are barred."
+        },
+        {
+          "name": "Unclean Hands",
+          "raw_text": "FIFTH AFFIRMATIVE DEFENSE - Plaintiff cannot seek damages or equity because the Plaintiff comes to the Court with unclean hands. As a result, Plaintiff's claims are barred."
+        },
+        {
+          "name": "No Duty of Confidentiality",
+          "raw_text": "SEVENTH AFFIRMATIVE DEFENSE - Defendant's duty of confidentiality did not extend to third parties who were present during Plaintiff's disclosure. As a result, Plaintiff's claims are barred."
+        },
+        {
+          "name": "No Confidential Information",
+          "raw_text": "EIGHTH AFFIRMATIVE DEFENSE - Defendant never received any confidential information from Plaintiff. Therefore, Plaintiff's claims ought to be barred."
+        },
+        {
+          "name": "Consent to Disclosure",
+          "raw_text": "NINTH AFFIRMATIVE DEFENSE - Plaintiff gave Defendant permission to disclose confidential information. Therefore, Plaintiff's claims ought to be barred."
+        }
+      ]
+    }
+  ]
+}

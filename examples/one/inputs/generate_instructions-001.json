@@ -1,0 +1,234 @@
+{
+  "case_facts": "Jennifer Gold and Roger Gold were siblings who formed South Miami Hose and Fittings LLC as 50/50 business partners in February 2021, following their father Richard Gold's retirement from a similar business. Roger Gold had worked in their father's company since 2003, while Jennifer Gold joined in 2018. The company's gross revenue grew from $273,051 in 2021 to $410,737 in 2022, with projected revenue of approximately $517,000 in 2023.\n\nIn August 2023, the siblings agreed to separate and close the business after Roger Gold expressed concerns about Jennifer Gold's limited contribution to operations. According to Roger's counterclaim, he handled the majority of customers (15-20) along with sales, marketing, purchasing, inventory control, shipping, receiving, deliveries, and collections, while Jennifer primarily handled administration and two export customers. After unsuccessful attempts to sell the business as a going concern, they agreed to sell the company's assets. The asset sale generated approximately $70,000 in proceeds for each partner.\n\nThe business dissolution led to legal disputes between the siblings. Jennifer Gold made an unauthorized withdrawal of approximately $32,000 from company accounts, believing she had not received her fair share of the proceeds. She subsequently filed suit in Miami-Dade County Court (Case No. 2024-036019-CC-26) seeking $50,000 in damages, claiming Roger Gold had improperly taken control of approximately 80% of the business's domestic clients, removed merchandise, conducted unauthorized transactions, and damaged her reputation. Roger Gold countersued, denying all allegations and asserting that Jennifer Gold had breached their partnership agreement by failing to contribute equally to the business and taking more than her rightful share of proceeds. He claimed she received approximately $18,000 in distributions beyond her fair share and sought damages for breach of contract, breach of fiduciary duty, and conversion. A separate case with Dade County Federal Credit Union resulted in Jennifer Gold agreeing to pay $2,500 to settle a $27,951.63 judgment in January 2024.",
+  "counterclaims": [
+    {
+      "claim_id": "9cf9c06a-36a1-4e81-80ef-a886ad6ff085",
+      "raw_texts": [
+        "COUNT I - BREACH OF CONTRACT"
+      ],
+      "damages": {
+        "compensatory": [
+          "consequential damages (unspecified amount)",
+          "compensatory damages (unspecified amount)",
+          "$27,951.63 original judgment amount",
+          "$2,500.00 agreed settlement amount"
+        ],
+        "punitive": [],
+        "statutory": [],
+        "equitable": [],
+        "other": [
+          "post-judgment interest",
+          "costs",
+          "attorney's fees",
+          "prejudgment interest"
+        ]
+      },
+      "defenses": []
+    },
+    {
+      "claim_id": "9e3b8d10-5fee-423c-b275-3f3b1e7af895",
+      "raw_texts": [
+        "COUNT II - BREACH OF FIDUCIARY DUTY"
+      ],
+      "damages": {
+        "compensatory": [
+          "consequential damages",
+          "Compensatory damages (unspecified amount)",
+          "compensatory damages",
+          "Consequential damages (unspecified amount)"
+        ],
+        "punitive": [],
+        "statutory": [],
+        "equitable": [],
+        "other": [
+          "Attorney's fees",
+          "attorney's fees",
+          "prejudgment and post-judgment interest",
+          "costs",
+          "Interest",
+          "such other relief as this Court deems proper",
+          "Other relief",
+          "Costs"
+        ]
+      },
+      "defenses": []
+    },
+    {
+      "claim_id": "7ccdb9f7-a835-4809-bbc6-d0a599ca0c50",
+      "raw_texts": [
+        "COUNT III - CONVERSION"
+      ],
+      "damages": {
+        "compensatory": [
+          "$2,500.00 agreed settlement amount",
+          "compensatory damages",
+          "consequential damages",
+          "$27,951.63 original judgment amount"
+        ],
+        "punitive": [],
+        "statutory": [],
+        "equitable": [],
+        "other": [
+          "post-judgment interest",
+          "costs",
+          "Jurisdiction reserved to enforce terms and conditions of stipulation",
+          "such other relief as this Court deems proper",
+          "attorney's fees",
+          "prejudgment interest"
+        ]
+      },
+      "defenses": []
+    }
+  ],
+  "claims": [
+    {
+      "claim_id": null,
+      "raw_texts": [
+        "COMPLAINT FOR DAMAGES"
+      ],
+      "damages": {
+        "compensatory": [
+          "Payment for taking 80% of the business",
+          "$50,000 total damages claim"
+        ],
+        "punitive": [],
+        "statutory": [],
+        "equitable": [],
+        "other": [
+          "Attorney's fees",
+          "Costs of suit",
+          "Such other and further relief as the court may deem proper"
+        ]
+      },
+      "defenses": [
+        {
+          "name": "Unclean Hands",
+          "raw_text": "Plaintiff has engaged in inequitable behavior, including fraud, deceit, unconscionability, and bad faith relating to their claim."
+        },
+        {
+          "name": "Setoff",
+          "raw_text": "Any damages award to Plaintiff/Counter-Defendant must be set off with any damages awarded to Defendant/Counter-Plaintiff stemming from the various counts."
+        },
+        {
+          "name": "Abandonment",
+          "raw_text": "Ms. Gold abandoned her responsibilities to the partnership."
+        },
+        {
+          "name": "Breach of Contract",
+          "raw_text": "Ms. Gold unjustifiably refused to perform her agreement in who or in any substantial part, allowing Mr. Gold to rescind the partnership agreement, which he did within a reasonable time, and provided Ms. Gold her rightful share of the proceeds of the sale of inventory."
+        },
+        {
+          "name": "Discharge",
+          "raw_text": "Ms. Gold materially breached her agreement with Mr. Gold, thereby discharging Mr. Gold from his obligations thereunder."
+        },
+        {
+          "name": "Prevention of Performance",
+          "raw_text": "One who prevents or makes impossible the performance or happening of a condition precedent upon which his liability by the terms of a contract is made to depend cannot avail himself of its nonperformance. Ms. Gold made it impossible for Mr. Gold to perform his obligations to the partnership by refusing to participate in the operations of the company."
+        },
+        {
+          "name": "Truth",
+          "raw_text": "Mr. Gold made statements about Ms. Gold that were truthful, and therefore not defamatory."
+        }
+      ]
+    },
+    {
+      "claim_id": "9cf9c06a-36a1-4e81-80ef-a886ad6ff085",
+      "raw_texts": [
+        "BREACH OF CONTRACT AND LIBEL"
+      ],
+      "damages": {
+        "compensatory": [
+          "$50,000 total damages claimed",
+          "Damages for slandering reputation",
+          "Payment for taking 80% of the business",
+          "Damages for threatening plaintiff and family"
+        ],
+        "punitive": [],
+        "statutory": [],
+        "equitable": [],
+        "other": [
+          "Such other and further relief as the court may deem proper",
+          "Attorney's fees",
+          "Costs of suit"
+        ]
+      },
+      "defenses": [
+        {
+          "name": "Unclean Hands",
+          "raw_text": "Plaintiff has engaged in inequitable behavior, including fraud, deceit, unconscionability, and bad faith relating to their claim."
+        },
+        {
+          "name": "Setoff",
+          "raw_text": "Any damages award to Plaintiff/Counter-Defendant must be set off with any damages awarded to Defendant/Counter-Plaintiff stemming from the various counts."
+        },
+        {
+          "name": "Abandonment",
+          "raw_text": "Ms. Gold abandoned her responsibilities to the partnership."
+        },
+        {
+          "name": "Prior Breach",
+          "raw_text": "Ms. Gold unjustifiably refused to perform her agreement in who or in any substantial part, allowing Mr. Gold to rescind the partnership agreement, which he did within a reasonable time, and provided Ms. Gold her rightful share of the proceeds of the sale of inventory."
+        },
+        {
+          "name": "Discharge by Material Breach",
+          "raw_text": "Ms. Gold materially breached her agreement with Mr. Gold, thereby discharging Mr. Gold from his obligations thereunder."
+        },
+        {
+          "name": "Prevention of Performance",
+          "raw_text": "One who prevents or makes impossible the performance or happening of a condition precedent upon which his liability by the terms of a contract is made to depend cannot avail himself of its nonperformance. Ms. Gold made it impossible for Mr. Gold to perform his obligations to the partnership by refusing to participate in the operations of the company."
+        },
+        {
+          "name": "Truth",
+          "raw_text": "Mr. Gold made statements about Ms. Gold that were truthful, and therefore not defamatory."
+        }
+      ]
+    },
+    {
+      "claim_id": "5c73c412-b29c-4213-bad2-a8fda00f0bb5",
+      "raw_texts": [
+        "BREACH OF CONTRACT AND LIBEL"
+      ],
+      "damages": {
+        "compensatory": [
+          "Payment for taking 80% of the business",
+          "Damages for business reputation harm",
+          "$50,000 in total damages claimed"
+        ],
+        "punitive": [],
+        "statutory": [],
+        "equitable": [],
+        "other": [
+          "Costs of suit",
+          "Such other and further relief as the court may deem proper",
+          "Attorney's fees"
+        ]
+      },
+      "defenses": [
+        {
+          "name": "Unclean Hands",
+          "raw_text": "Plaintiff has engaged in inequitable behavior, including fraud, deceit, unconscionability, and bad faith relating to their claim."
+        },
+        {
+          "name": "Setoff",
+          "raw_text": "Any damages award to Plaintiff/Counter-Defendant must be set off with any damages awarded to Defendant/Counter-Plaintiff stemming from the various counts."
+        },
+        {
+          "name": "Abandonment",
+          "raw_text": "Ms. Gold abandoned her responsibilities to the partnership."
+        },
+        {
+          "name": "Prior Breach",
+          "raw_text": "Ms. Gold unjustifiably refused to perform her agreement in who or in any substantial part, allowing Mr. Gold to rescind the partnership agreement, which he did within a reasonable time, and provided Ms. Gold her rightful share of the proceeds of the sale of inventory."
+        },
+        {
+          "name": "Prevention of Performance",
+          "raw_text": "One who prevents or makes impossible the performance or happening of a condition precedent upon which his liability by the terms of a contract is made to depend cannot avail himself of its nonperformance. Ms. Gold made it impossible for Mr. Gold to perform his obligations to the partnership by refusing to participate in the operations of the company."
+        },
+        {
+          "name": "Truth",
+          "raw_text": "Mr. Gold made statements about Ms. Gold that were truthful, and therefore not defamatory."
+        }
+      ]
+    }
+  ]
+}

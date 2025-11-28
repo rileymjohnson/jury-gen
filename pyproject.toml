@@ -12,10 +12,10 @@ authors = [{ name = "Riley" }]
 license = { text = "Proprietary" }
 dependencies = []
 
-[project.optional-dependencies]
-dev = [
-  "ruff>=0.6.9",
-]
+[tool.uv]
+package = false
+
+## Removed optional "dev" extras in favor of uv dependency groups
 
 [tool.ruff]
 line-length = 120
@@ -40,3 +40,11 @@ quote-style = "double"
 indent-style = "space"
 skip-magic-trailing-comma = false
 line-ending = "auto"
+
+[dependency-groups]
+dev = [
+    "boto3>=1.41.5",
+    "streamlit>=1.51.0",
+    "ruff>=0.6.9",
+    "requests>=2.32.3",
+]

@@ -88,12 +88,30 @@ Return all individual witnesses found.""",
         contentType="application/json",
     )
 
-    response_body = json.loads(response.get("body").read())
+    # Handle different body types (StreamingBody, bytes, str)
+    body_obj = response.get("body")
+    raw = body_obj.read() if hasattr(body_obj, "read") else body_obj
+    if isinstance(raw, bytes):
+        raw = raw.decode("utf-8", errors="replace")
 
-    # Extract tool use result
-    for item in response_body.get("content", []):
-        if item.get("type") == "tool_use":
-            witnesses = item["input"]["witnesses"]
+    try:
+        response_body = json.loads(raw)
+    except Exception:
+        # If the model returned non-JSON or empty, fallback gracefully
+        return []
+
+    # Extract tool use result, accepting either a dict with `content` or a top-level list
+    if isinstance(response_body, dict):
+        content_items = response_body.get("content", [])
+    elif isinstance(response_body, list):
+        content_items = response_body
+    else:
+        content_items = []
+
+    for item in content_items:
+        if isinstance(item, dict) and item.get("type") == "tool_use":
+            tool_input = item.get("input") or {}
+            witnesses = tool_input.get("witnesses") or []
 
             # Deduplicate witnesses (same first and last name)
             seen = set()

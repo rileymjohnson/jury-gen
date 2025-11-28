@@ -62,3 +62,4 @@ logs/
 
 # Misc
 *.zip
+runs/
