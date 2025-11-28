@@ -1,7 +1,11 @@
 import argparse
 from datetime import datetime
 import json
+import os
 from pathlib import Path
+import shutil
+import subprocess
+import sys
 import time
 from typing import Any
 
@@ -56,11 +60,91 @@ def call_api_start(
 def call_api_status(base_url: str, api_key: str, job_id: str) -> dict[str, Any]:
     url = f"{base_url}/jury/status/{job_id}"
     r = requests.get(url, headers={"x-api-key": api_key})
+    if r.status_code == 404:  # noqa: PLR2004
+        return {"_not_found": True}
     r.raise_for_status()
     return r.json()
 
 
-def run(example: str, env: str, out_root: Path, base_url: str, api_key: str) -> Path:
+def _infer_region_from_url(api_url: str) -> str:
+    try:
+        host = api_url.split("//", 1)[1].split("/", 1)[0]
+        parts = host.split(".")
+        if len(parts) >= 5 and parts[1] == "execute-api":  # noqa: PLR2004
+            return parts[2]
+    except Exception:
+        pass
+    return "us-east-1"
+
+
+def _capture_sfn_history_cli(execution_arn: str, region: str, out_path: Path, aws_profile: str | None = None) -> None:
+    if shutil.which("aws") is None:
+        print("AWS CLI not found; skipping Step Functions history capture.")
+        return
+    events: list[dict] = []
+    next_token: str | None = None
+    while True:
+        cmd = [
+            "aws",
+            "stepfunctions",
+            "get-execution-history",
+            "--execution-arn",
+            execution_arn,
+            "--region",
+            region,
+            "--max-results",
+            "1000",
+        ]
+        if next_token:
+            cmd += ["--next-token", next_token]
+        env = None
+        if aws_profile:
+            env = dict(**{k: v for k, v in (dict(**os.environ)).items() if True})
+            env["AWS_PROFILE"] = aws_profile
+        res = subprocess.run(
+            cmd,
+            capture_output=True,
+            text=True,
+            check=False,
+            encoding="utf-8",
+            errors="replace",
+            env=env,
+        )
+        if res.returncode != 0:
+            try:
+                enc = sys.stdout.encoding or "utf-8"
+                safe_err = (res.stderr or "").encode(enc, errors="replace").decode(enc, errors="replace")
+                print("Failed to fetch execution history:", safe_err.strip())
+            except Exception:
+                print("Failed to fetch execution history (stderr encoding issue)")
+            break
+        try:
+            payload = json.loads(res.stdout)
+        except Exception as e:
+            print("Failed to parse execution history JSON:", e)
+            break
+        events.extend(payload.get("events", []))
+        nt = payload.get("nextToken") or payload.get("next_token")
+        if not nt:
+            break
+        next_token = nt
+
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    with out_path.open("w", encoding="utf-8") as f:
+        json.dump({"events": events, "executionArn": execution_arn, "region": region}, f, indent=2)
+    print(f"Saved Step Functions history to {out_path}")
+
+
+def run(  # noqa: PLR0913, PLR0915
+    example: str,
+    env: str,
+    out_root: Path,
+    base_url: str,
+    api_key: str,
+    capture_history: bool = True,
+    region: str | None = None,
+    aws_profile: str | None = None,
+) -> Path:
     repo_root = Path(__file__).resolve().parents[1]
     base_url = base_url.rstrip("/")
 
@@ -98,6 +182,7 @@ def run(example: str, env: str, out_root: Path, base_url: str, api_key: str) -> 
     job_id = start_resp.get("jury_instruction_id")
     if not job_id:
         raise SystemExit("api_start did not return jury_instruction_id")
+    execution_arn = start_resp.get("executionArn")
 
     # 4) Poll status
     poll_path = out_dir / "responses" / "status_progress.jsonl"
@@ -137,6 +222,16 @@ def run(example: str, env: str, out_root: Path, base_url: str, api_key: str) -> 
     }
     write_json(out_dir / "final.json", final)
 
+    # 6) Optionally capture Step Functions execution history
+    if capture_history and execution_arn:
+        effective_region = region or _infer_region_from_url(base_url)
+        _capture_sfn_history_cli(
+            execution_arn,
+            effective_region,
+            out_dir / "responses" / "sfn_history.json",
+            aws_profile=aws_profile,
+        )
+
     return out_dir
 
 
@@ -147,9 +242,21 @@ def main():
     ap.add_argument("--out", default="runs", help="Output folder root (default: runs)")
     ap.add_argument("--api-url", default=DEFAULT_API_URL, help="Base API URL (default: dev URL)")
     ap.add_argument("--api-key", default=DEFAULT_API_KEY, help="API key (default: dev key)")
+    ap.add_argument("--no-capture-history", action="store_true", help="Do not capture Step Functions execution history")
+    ap.add_argument("--region", default=None, help="AWS region for Step Functions history (defaults from API URL)")
+    ap.add_argument("--aws-profile", default=None, help="AWS profile to use for history capture (optional)")
     args = ap.parse_args()
 
-    out_dir = run(args.example, args.env, Path(args.out), args.api_url, args.api_key)
+    out_dir = run(
+        args.example,
+        args.env,
+        Path(args.out),
+        args.api_url,
+        args.api_key,
+        capture_history=not args.no_capture_history,
+        region=args.region,
+        aws_profile=args.aws_profile,
+    )
     print(f"Done. Results in: {out_dir}")
 
 
