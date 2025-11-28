@@ -256,7 +256,7 @@ def main() -> None:  # noqa: PLR0912, PLR0915
         # default: first one
         files = files[:1]
 
-    handler, lambda_dir = resolve_handler(args.lambda_name)
+    handler, _ = resolve_handler(args.lambda_name)
 
     save_dir = Path(args.save_outdir) if args.save_outdir else None
     if save_dir:
