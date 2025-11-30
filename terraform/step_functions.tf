@@ -10,6 +10,13 @@ resource "aws_sfn_state_machine" "jury_app_workflow" {
       "StartJob": {
         "Type": "Task",
         "Resource": "${aws_lambda_function.job_start.arn}",
+        "Catch": [
+          {
+            "ErrorEquals": ["States.ALL"],
+            "ResultPath": "$.error",
+            "Next": "JobFailed"
+          }
+        ],
         "ResultPath": "$.job_data",
         "Next": "ProcessDocuments"
       },
@@ -199,6 +206,13 @@ resource "aws_sfn_state_machine" "jury_app_workflow" {
 
       "ExtractCoreData": {
         "Type": "Parallel",
+        "Catch": [
+          {
+            "ErrorEquals": ["States.ALL"],
+            "ResultPath": "$.error",
+            "Next": "JobFailed"
+          }
+        ],
         "ResultPath": "$.core_results",
         "Next": "AssembleCoreResults",
         "Branches": [
@@ -280,6 +294,13 @@ resource "aws_sfn_state_machine" "jury_app_workflow" {
 
       "EnrichCore": {
         "Type": "Parallel",
+        "Catch": [
+          {
+            "ErrorEquals": ["States.ALL"],
+            "ResultPath": "$.error",
+            "Next": "JobFailed"
+          }
+        ],
         "Branches": [
           {
             "StartAt": "EnrichClaims",
@@ -377,6 +398,13 @@ resource "aws_sfn_state_machine" "jury_app_workflow" {
           "counterclaims.$": "$.counterclaims",
           "case_facts.$": "$.case_facts"
         },
+        "Catch": [
+          {
+            "ErrorEquals": ["States.ALL"],
+            "ResultPath": "$.error",
+            "Next": "JobFailed"
+          }
+        ],
         "ResultPath": "$.instructions",
         "Next": "SaveResults"
       },
@@ -384,6 +412,13 @@ resource "aws_sfn_state_machine" "jury_app_workflow" {
       "SaveResults": {
         "Type": "Task",
         "Resource": "${aws_lambda_function.job_save_results.arn}",
+        "Catch": [
+          {
+            "ErrorEquals": ["States.ALL"],
+            "ResultPath": "$.error",
+            "Next": "JobFailed"
+          }
+        ],
         "End": true
       },
 

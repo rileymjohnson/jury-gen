@@ -62,6 +62,10 @@ def match_claim_to_category(claim_title, case_facts, standard_categories):
     # Format categories for the prompt
     categories_list = "\n".join([f"{num}: {title}" for num, title in standard_categories])
 
+    print('claim_title', claim_title)
+    print('case_facts', case_facts)
+    print('standard_categories', standard_categories)
+
     tools = [
         {
             "name": "match_category",
