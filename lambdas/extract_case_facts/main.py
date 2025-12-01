@@ -1,6 +1,7 @@
-import logging
-import json
 import gzip
+import json
+import logging
+
 import boto3
 
 # Import logic from the local 'case_facts_processing.py' file
@@ -44,7 +45,7 @@ def lambda_handler(event, context):
     # 1. Get input from the event
     try:
         # The input for this step is an object containing all chunks
-        complaint_chunks = _load_chunks(event.get("complaint_chunks", [])) if event.get("complaint_chunks") is not None else []
+        complaint_chunks = _load_chunks(event.get("complaint_chunks", [])) if event.get("complaint_chunks") is not None else []  # noqa: E501
         answer_chunks = _load_chunks(event.get("answer_chunks", [])) if event.get("answer_chunks") is not None else []
         witness_chunks_val = event.get("witness_chunks")
         witness_chunks = _load_chunks(witness_chunks_val) if witness_chunks_val is not None else []  # Optional
