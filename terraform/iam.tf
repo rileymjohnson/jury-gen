@@ -203,9 +203,12 @@ resource "aws_iam_role" "textract_get_results" {
           Action   = ["textract:GetDocumentTextDetection"],
           Resource = "*"
         },
-        { # Delete the temp file
+        { # Write results and delete the temp file in processing bucket
           Effect   = "Allow",
-          Action   = ["s3:DeleteObject"],
+          Action   = [
+            "s3:PutObject",
+            "s3:DeleteObject"
+          ],
           Resource = "${aws_s3_bucket.processing.arn}/*"
         }
       ]
@@ -243,6 +246,19 @@ resource "aws_iam_policy" "bedrock_analyzer_policy" {
 resource "aws_iam_role" "extract_legal_claims" {
   name               = "ExtractLegalClaimsLambdaRole${local.env_suffix}"
   assume_role_policy = data.aws_iam_policy_document.lambda_assume_role.json
+  inline_policy {
+    name = "ExtractLegalClaimsS3Read"
+    policy = jsonencode({
+      Version = "2012-10-17",
+      Statement = [
+        {
+          Effect   = "Allow",
+          Action   = ["s3:GetObject"],
+          Resource = "${aws_s3_bucket.processing.arn}/*"
+        }
+      ]
+    })
+  }
 }
 resource "aws_iam_role_policy_attachment" "extract_legal_claims_logging" {
   role       = aws_iam_role.extract_legal_claims.name
@@ -257,6 +273,19 @@ resource "aws_iam_role_policy_attachment" "extract_legal_claims_bedrock" {
 resource "aws_iam_role" "extract_witnesses" {
   name               = "ExtractWitnessesLambdaRole${local.env_suffix}"
   assume_role_policy = data.aws_iam_policy_document.lambda_assume_role.json
+  inline_policy {
+    name = "ExtractWitnessesS3Read"
+    policy = jsonencode({
+      Version = "2012-10-17",
+      Statement = [
+        {
+          Effect   = "Allow",
+          Action   = ["s3:GetObject"],
+          Resource = "${aws_s3_bucket.processing.arn}/*"
+        }
+      ]
+    })
+  }
 }
 resource "aws_iam_role_policy_attachment" "extract_witnesses_logging" {
   role       = aws_iam_role.extract_witnesses.name
@@ -271,6 +300,19 @@ resource "aws_iam_role_policy_attachment" "extract_witnesses_bedrock" {
 resource "aws_iam_role" "extract_case_facts" {
   name               = "ExtractCaseFactsLambdaRole${local.env_suffix}"
   assume_role_policy = data.aws_iam_policy_document.lambda_assume_role.json
+  inline_policy {
+    name = "ExtractCaseFactsS3Read"
+    policy = jsonencode({
+      Version = "2012-10-17",
+      Statement = [
+        {
+          Effect   = "Allow",
+          Action   = ["s3:GetObject"],
+          Resource = "${aws_s3_bucket.processing.arn}/*"
+        }
+      ]
+    })
+  }
 }
 resource "aws_iam_role_policy_attachment" "extract_case_facts_logging" {
   role       = aws_iam_role.extract_case_facts.name
@@ -285,6 +327,19 @@ resource "aws_iam_role_policy_attachment" "extract_case_facts_bedrock" {
 resource "aws_iam_role" "enrich_legal_item" {
   name               = "EnrichLegalItemLambdaRole${local.env_suffix}"
   assume_role_policy = data.aws_iam_policy_document.lambda_assume_role.json
+  inline_policy {
+    name = "EnrichLegalItemS3Read"
+    policy = jsonencode({
+      Version = "2012-10-17",
+      Statement = [
+        {
+          Effect   = "Allow",
+          Action   = ["s3:GetObject"],
+          Resource = "${aws_s3_bucket.processing.arn}/*"
+        }
+      ]
+    })
+  }
 }
 resource "aws_iam_role_policy_attachment" "enrich_legal_item_logging" {
   role       = aws_iam_role.enrich_legal_item.name

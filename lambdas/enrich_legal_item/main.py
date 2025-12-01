@@ -1,4 +1,7 @@
 import logging
+import json
+import gzip
+import boto3
 
 # Import logic from the local 'enrichment_processing.py' file
 import enrichment_processing
@@ -6,6 +9,26 @@ import enrichment_processing
 # Set up logging
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
+
+s3 = boto3.client("s3")
+
+
+def _load_chunks(maybe_chunks):
+    if isinstance(maybe_chunks, list):
+        return maybe_chunks
+    if isinstance(maybe_chunks, dict):
+        compression = maybe_chunks.get("Compression")
+        s3obj = maybe_chunks.get("S3Object") or maybe_chunks
+        if isinstance(s3obj, dict) and "Bucket" in s3obj and "Key" in s3obj:
+            obj = s3.get_object(Bucket=s3obj["Bucket"], Key=s3obj["Key"])
+            body = obj["Body"].read()
+            if compression == "gzip" or s3obj["Key"].endswith(".gz"):
+                body = gzip.decompress(body)
+            chunks = json.loads(body.decode("utf-8"))
+            if not isinstance(chunks, list):
+                raise ValueError("Loaded chunks is not a list")
+            return chunks
+    raise ValueError("Invalid chunks input; expected list or S3 pointer dict")
 
 
 def lambda_handler(event, context):
@@ -24,8 +47,8 @@ def lambda_handler(event, context):
         item_type = event["type"]  # "claim" or "counterclaim"
 
         # We also get all chunks
-        complaint_chunks = event.get("complaint_chunks", [])
-        answer_chunks = event.get("answer_chunks", [])
+        complaint_chunks = _load_chunks(event.get("complaint_chunks", []))
+        answer_chunks = _load_chunks(event.get("answer_chunks", []))
 
         if not item or not item_type:
             raise ValueError("Input event must contain 'item' and 'type'")
