@@ -1,6 +1,7 @@
-import logging
-import json
 import gzip
+import json
+import logging
+
 import boto3
 
 # Import logic from the local 'witness_processing.py' file

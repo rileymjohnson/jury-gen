@@ -1,7 +1,7 @@
-import logging
-import json
 import gzip
-from io import BytesIO
+import json
+import logging
+
 import boto3
 
 # --- Import logic from the local file ---

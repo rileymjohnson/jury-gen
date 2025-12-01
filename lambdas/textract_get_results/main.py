@@ -1,8 +1,8 @@
-import logging
-import os
-import json
 import gzip
 from io import BytesIO
+import json
+import logging
+import os
 
 import boto3
 from nltk.tokenize import sent_tokenize
@@ -63,7 +63,7 @@ def extract_text_chunks(text: str, max_chunk_tokens: int = 2000) -> list[str]:
     return chunks
 
 
-def lambda_handler(event, context):
+def lambda_handler(event, context):  # noqa: PLR0915
     """
     Gets the full text from a completed Textract job, chunks it,
     and cleans up the temporary S3 file.
@@ -142,7 +142,13 @@ def lambda_handler(event, context):
             gz.write(payload)
         gz_bytes = buf.getvalue()
 
-        s3.put_object(Bucket=bucket, Key=results_key, Body=gz_bytes, ContentType="application/json", ContentEncoding="gzip")
+        s3.put_object(
+            Bucket=bucket,
+            Key=results_key,
+            Body=gz_bytes,
+            ContentType="application/json",
+            ContentEncoding="gzip"
+        )
         logger.info(f"Uploaded chunks to s3://{bucket}/{results_key} ({len(gz_bytes)} bytes gzipped)")
 
         return {
