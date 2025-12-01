@@ -7,10 +7,13 @@ COPY requirements.txt ${LAMBDA_TASK_ROOT}/
 # Install the Python packages
 RUN pip install -r ${LAMBDA_TASK_ROOT}/requirements.txt
 
-# --- This is the key part ---
-# Run the NLTK downloader to fetch the 'punkt' tokenizer
-# This bakes the data right into the container image.
-RUN python -m nltk.downloader punkt
+# --- Bundle NLTK tokenizers ---
+# Download 'punkt' and (if available) 'punkt_tab' into the function code dir
+# and point NLTK to it via NLTK_DATA. This avoids runtime downloads.
+ENV NLTK_DATA=${LAMBDA_TASK_ROOT}/nltk_data
+RUN mkdir -p ${NLTK_DATA} \
+ && python -m nltk.downloader -d ${NLTK_DATA} punkt \
+ && (python -m nltk.downloader -d ${NLTK_DATA} punkt_tab || true)
 
 # Copy the rest of your Lambda function's code
 COPY main.py ${LAMBDA_TASK_ROOT}/
