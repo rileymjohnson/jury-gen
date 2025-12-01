@@ -1,4 +1,8 @@
 import logging
+import os
+import json
+import gzip
+from io import BytesIO
 
 import boto3
 from nltk.tokenize import sent_tokenize
@@ -125,5 +129,28 @@ def lambda_handler(event, context):
         logger.error(f"Failed to chunk text: {e}")
         raise RuntimeError(f"Text chunking failed: {e!s}") from e
 
-    # 5. Return the chunks (NO CHANGE HERE)
-    return chunks
+    # 5. Persist chunks to S3 and return a pointer to avoid Step Functions size limits
+    try:
+        # Prefer the processing bucket already in use
+        bucket = os.environ.get("PROCESSING_BUCKET_NAME", temp_bucket)
+        results_key = f"results/{job_id}.chunks.json.gz"
+
+        # Serialize and gzip the chunks
+        payload = json.dumps(chunks).encode("utf-8")
+        buf = BytesIO()
+        with gzip.GzipFile(fileobj=buf, mode="wb") as gz:
+            gz.write(payload)
+        gz_bytes = buf.getvalue()
+
+        s3.put_object(Bucket=bucket, Key=results_key, Body=gz_bytes, ContentType="application/json", ContentEncoding="gzip")
+        logger.info(f"Uploaded chunks to s3://{bucket}/{results_key} ({len(gz_bytes)} bytes gzipped)")
+
+        return {
+            "S3Object": {"Bucket": bucket, "Key": results_key},
+            "Compression": "gzip",
+            "ChunkCount": len(chunks),
+            "JobId": job_id,
+        }
+    except Exception as e:
+        logger.error(f"Failed to upload chunks to S3: {e!s}")
+        raise RuntimeError(f"Persisting chunks failed: {e!s}") from e
