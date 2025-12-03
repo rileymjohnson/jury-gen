@@ -65,6 +65,12 @@ resource "aws_cloudfront_distribution" "web_cdn" {
     response_page_path = "/index.html"
   }
 
+  custom_error_response {
+    error_code         = 403
+    response_code      = 200
+    response_page_path = "/index.html"
+  }
+
   restrictions {
     geo_restriction {
       restriction_type = "none"
@@ -81,18 +87,32 @@ resource "aws_s3_bucket_policy" "web_site" {
   bucket = aws_s3_bucket.web_site.id
   policy = jsonencode({
     Version = "2012-10-17",
-    Statement = [{
-      Sid      = "AllowCloudFrontOACRead",
-      Effect   = "Allow",
-      Principal = { Service = "cloudfront.amazonaws.com" },
-      Action   = ["s3:GetObject"],
-      Resource = ["${aws_s3_bucket.web_site.arn}/*"],
-      Condition = {
-        StringEquals = {
-          "AWS:SourceArn" = aws_cloudfront_distribution.web_cdn.arn
+    Statement = [
+      {
+        Sid      = "AllowCloudFrontOACReadObjects",
+        Effect   = "Allow",
+        Principal = { Service = "cloudfront.amazonaws.com" },
+        Action   = ["s3:GetObject"],
+        Resource = ["${aws_s3_bucket.web_site.arn}/*"],
+        Condition = {
+          StringEquals = {
+            "AWS:SourceArn" = aws_cloudfront_distribution.web_cdn.arn
+          }
+        }
+      },
+      {
+        Sid      = "AllowCloudFrontOACListBucket",
+        Effect   = "Allow",
+        Principal = { Service = "cloudfront.amazonaws.com" },
+        Action   = ["s3:ListBucket"],
+        Resource = aws_s3_bucket.web_site.arn,
+        Condition = {
+          StringEquals = {
+            "AWS:SourceArn" = aws_cloudfront_distribution.web_cdn.arn
+          }
         }
       }
-    }]
+    ]
   })
 }
 
