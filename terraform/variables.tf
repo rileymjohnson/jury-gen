@@ -28,6 +28,18 @@ variable "ci_repository_id" {
   default     = "rileymjohnson/jury-gen"
 }
 
+variable "web_repository_id" {
+  description = "Frontend repository for CodePipeline (e.g., 'owner/repo')"
+  type        = string
+  default     = "rileymjohnson/jury-gen-web"
+}
+
+variable "web_branch" {
+  description = "Branch of the frontend repo to build/deploy"
+  type        = string
+  default     = "main"
+}
+
 variable "state_bucket_name" {
   description = "S3 bucket name for Terraform remote state (for CodeBuild access)"
   type        = string

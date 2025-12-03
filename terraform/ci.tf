@@ -180,7 +180,13 @@ resource "aws_iam_role_policy" "codepipeline" {
     Version = "2012-10-17",
     Statement = [
       { Effect = "Allow", Action = ["s3:PutObject", "s3:GetObject", "s3:GetObjectVersion", "s3:GetBucketVersioning"], Resource = [aws_s3_bucket.ci_artifacts.arn, "${aws_s3_bucket.ci_artifacts.arn}/*"] },
-      { Effect = "Allow", Action = ["codebuild:BatchGetBuilds", "codebuild:StartBuild"], Resource = [aws_codebuild_project.lint.arn, aws_codebuild_project.docker.arn, aws_codebuild_project.tf_plan.arn, aws_codebuild_project.tf_apply.arn] }
+      { Effect = "Allow", Action = ["codebuild:BatchGetBuilds", "codebuild:StartBuild"], Resource = [
+        aws_codebuild_project.lint.arn,
+        aws_codebuild_project.docker.arn,
+        aws_codebuild_project.tf_plan.arn,
+        aws_codebuild_project.tf_apply.arn,
+        aws_codebuild_project.web_build_deploy.arn
+      ] }
     ]
   })
 }
