@@ -126,9 +126,18 @@ resource "aws_codebuild_project" "web_build_deploy" {
     compute_type = "BUILD_GENERAL1_SMALL"
     image        = "aws/codebuild/standard:7.0"
     type         = "LINUX_CONTAINER"
-    environment_variable { name = "WEB_S3_BUCKET" value = aws_s3_bucket.web_site.bucket }
-    environment_variable { name = "WEB_CF_DISTRIBUTION_ID" value = aws_cloudfront_distribution.web_cdn.id }
-    environment_variable { name = "WEB_BUILD_DIR" value = "dist" }
+    environment_variable {
+      name  = "WEB_S3_BUCKET"
+      value = aws_s3_bucket.web_site.bucket
+    }
+    environment_variable {
+      name  = "WEB_CF_DISTRIBUTION_ID"
+      value = aws_cloudfront_distribution.web_cdn.id
+    }
+    environment_variable {
+      name  = "WEB_BUILD_DIR"
+      value = "dist"
+    }
   }
 
   source {
