@@ -131,7 +131,10 @@ resource "aws_iam_role_policy" "cb_web" {
       { Effect = "Allow", Action = ["logs:CreateLogGroup", "logs:CreateLogStream", "logs:PutLogEvents"], Resource = "*" },
       { Effect = "Allow", Action = ["s3:ListBucket"], Resource = [aws_s3_bucket.web_site.arn] },
       { Effect = "Allow", Action = ["s3:PutObject", "s3:DeleteObject", "s3:GetObject", "s3:GetObjectVersion"], Resource = ["${aws_s3_bucket.web_site.arn}/*"] },
-      { Effect = "Allow", Action = ["cloudfront:CreateInvalidation"], Resource = [aws_cloudfront_distribution.web_cdn.arn] }
+      { Effect = "Allow", Action = ["cloudfront:CreateInvalidation"], Resource = [aws_cloudfront_distribution.web_cdn.arn] },
+      # Allow CodeBuild to read/write CodePipeline artifacts in the CI bucket
+      { Effect = "Allow", Action = ["s3:ListBucket"], Resource = [aws_s3_bucket.ci_artifacts.arn] },
+      { Effect = "Allow", Action = ["s3:GetObject", "s3:GetObjectVersion", "s3:PutObject"], Resource = ["${aws_s3_bucket.ci_artifacts.arn}/*"] }
     ]
   })
 }
