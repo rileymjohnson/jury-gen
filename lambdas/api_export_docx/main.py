@@ -1,8 +1,8 @@
 import base64
+from io import BytesIO
 import json
 import logging
 import os
-from io import BytesIO
 
 import boto3
 from docx import Document
