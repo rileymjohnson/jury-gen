@@ -15,20 +15,21 @@ data "aws_iam_policy_document" "lambda_assume_role" {
 resource "aws_iam_role" "api_signer" {
   name               = "ApiSignerLambdaRole${local.env_suffix}"
   assume_role_policy = data.aws_iam_policy_document.lambda_assume_role.json
+}
 
-  inline_policy {
-    name = "SignerS3PutPolicy"
-    policy = jsonencode({
-      Version = "2012-10-17",
-      Statement = [
-        {
-          Effect   = "Allow",
-          Action   = ["s3:PutObject"],
-          Resource = "${aws_s3_bucket.uploads.arn}/*"
-        }
-      ]
-    })
-  }
+resource "aws_iam_role_policy" "api_signer_inline" {
+  name = "SignerS3PutPolicy"
+  role = aws_iam_role.api_signer.id
+  policy = jsonencode({
+    Version = "2012-10-17",
+    Statement = [
+      {
+        Effect   = "Allow",
+        Action   = ["s3:PutObject"],
+        Resource = "${aws_s3_bucket.uploads.arn}/*"
+      }
+    ]
+  })
 }
 resource "aws_iam_role_policy_attachment" "api_signer_logging" {
   role       = aws_iam_role.api_signer.name
@@ -38,20 +39,21 @@ resource "aws_iam_role_policy_attachment" "api_signer_logging" {
 resource "aws_iam_role" "api_start" {
   name               = "ApiStartLambdaRole${local.env_suffix}"
   assume_role_policy = data.aws_iam_policy_document.lambda_assume_role.json
+}
 
-  inline_policy {
-    name = "StartStepFunctionsPolicy"
-    policy = jsonencode({
-      Version = "2012-10-17",
-      Statement = [
-        {
-          Effect   = "Allow",
-          Action   = ["states:StartExecution"],
-          Resource = aws_sfn_state_machine.jury_app_workflow.arn
-        }
-      ]
-    })
-  }
+resource "aws_iam_role_policy" "api_start_inline" {
+  name = "StartStepFunctionsPolicy"
+  role = aws_iam_role.api_start.id
+  policy = jsonencode({
+    Version = "2012-10-17",
+    Statement = [
+      {
+        Effect   = "Allow",
+        Action   = ["states:StartExecution"],
+        Resource = aws_sfn_state_machine.jury_app_workflow.arn
+      }
+    ]
+  })
 }
 resource "aws_iam_role_policy_attachment" "api_start_logging" {
   role       = aws_iam_role.api_start.name
@@ -61,20 +63,21 @@ resource "aws_iam_role_policy_attachment" "api_start_logging" {
 resource "aws_iam_role" "api_status" {
   name               = "ApiStatusLambdaRole${local.env_suffix}"
   assume_role_policy = data.aws_iam_policy_document.lambda_assume_role.json
+}
 
-  inline_policy {
-    name = "StatusDynamoReadPolicy"
-    policy = jsonencode({
-      Version = "2012-10-17",
-      Statement = [
-        {
-          Effect   = "Allow",
-          Action   = ["dynamodb:GetItem"],
-          Resource = aws_dynamodb_table.jury_instructions.arn
-        }
-      ]
-    })
-  }
+resource "aws_iam_role_policy" "api_status_inline" {
+  name = "StatusDynamoReadPolicy"
+  role = aws_iam_role.api_status.id
+  policy = jsonencode({
+    Version = "2012-10-17",
+    Statement = [
+      {
+        Effect   = "Allow",
+        Action   = ["dynamodb:GetItem"],
+        Resource = aws_dynamodb_table.jury_instructions.arn
+      }
+    ]
+  })
 }
 resource "aws_iam_role_policy_attachment" "api_status_logging" {
   role       = aws_iam_role.api_status.name
@@ -105,21 +108,21 @@ resource "aws_iam_policy" "lambda_basic_logging" {
 resource "aws_iam_role" "job_start" {
   name               = "JobStartLambdaRole${local.env_suffix}"
   assume_role_policy = data.aws_iam_policy_document.lambda_assume_role.json
+}
 
-  # Specific permissions for this Lambda
-  inline_policy {
-    name = "JobStartPolicy"
-    policy = jsonencode({
-      Version = "2012-10-17",
-      Statement = [
-        {
-          Effect   = "Allow",
-          Action   = ["dynamodb:PutItem"],
-          Resource = aws_dynamodb_table.jury_instructions.arn
-        }
-      ]
-    })
-  }
+resource "aws_iam_role_policy" "job_start_inline" {
+  name = "JobStartPolicy"
+  role = aws_iam_role.job_start.id
+  policy = jsonencode({
+    Version = "2012-10-17",
+    Statement = [
+      {
+        Effect   = "Allow",
+        Action   = ["dynamodb:PutItem"],
+        Resource = aws_dynamodb_table.jury_instructions.arn
+      }
+    ]
+  })
 }
 resource "aws_iam_role_policy_attachment" "job_start_logging" {
   role       = aws_iam_role.job_start.name
@@ -130,34 +133,35 @@ resource "aws_iam_role_policy_attachment" "job_start_logging" {
 resource "aws_iam_role" "textract_start" {
   name               = "TextractStartLambdaRole${local.env_suffix}"
   assume_role_policy = data.aws_iam_policy_document.lambda_assume_role.json
+}
 
-  inline_policy {
-    name = "TextractStartPolicy"
-    policy = jsonencode({
-      Version = "2012-10-17",
-      Statement = [
-        { # Read from the uploads bucket
-          Effect   = "Allow",
-          Action   = ["s3:GetObject"],
-          Resource = "${aws_s3_bucket.uploads.arn}/*"
-        },
-        { # Write to the processing bucket
-          Effect   = "Allow",
-          Action   = [
-            "s3:GetObject",
-            "s3:PutObject",
-            "s3:DeleteObject"
-          ],
-          Resource = "${aws_s3_bucket.processing.arn}/*"
-        },
-        { # Start Textract
-          Effect   = "Allow",
-          Action   = ["textract:StartDocumentTextDetection"],
-          Resource = "*"
-        }
-      ]
-    })
-  }
+resource "aws_iam_role_policy" "textract_start_inline" {
+  name = "TextractStartPolicy"
+  role = aws_iam_role.textract_start.id
+  policy = jsonencode({
+    Version = "2012-10-17",
+    Statement = [
+      { # Read from the uploads bucket
+        Effect   = "Allow",
+        Action   = ["s3:GetObject"],
+        Resource = "${aws_s3_bucket.uploads.arn}/*"
+      },
+      { # Write to the processing bucket
+        Effect   = "Allow",
+        Action   = [
+          "s3:GetObject",
+          "s3:PutObject",
+          "s3:DeleteObject"
+        ],
+        Resource = "${aws_s3_bucket.processing.arn}/*"
+      },
+      { # Start Textract
+        Effect   = "Allow",
+        Action   = ["textract:StartDocumentTextDetection"],
+        Resource = "*"
+      }
+    ]
+  })
 }
 resource "aws_iam_role_policy_attachment" "textract_start_logging" {
   role       = aws_iam_role.textract_start.name
@@ -168,20 +172,21 @@ resource "aws_iam_role_policy_attachment" "textract_start_logging" {
 resource "aws_iam_role" "textract_check_status" {
   name               = "TextractCheckStatusLambdaRole${local.env_suffix}"
   assume_role_policy = data.aws_iam_policy_document.lambda_assume_role.json
+}
 
-  inline_policy {
-    name = "TextractCheckStatusPolicy"
-    policy = jsonencode({
-      Version = "2012-10-17",
-      Statement = [
-        {
-          Effect   = "Allow",
-          Action   = ["textract:GetDocumentTextDetection"],
-          Resource = "*"
-        }
-      ]
-    })
-  }
+resource "aws_iam_role_policy" "textract_check_status_inline" {
+  name = "TextractCheckStatusPolicy"
+  role = aws_iam_role.textract_check_status.id
+  policy = jsonencode({
+    Version = "2012-10-17",
+    Statement = [
+      {
+        Effect   = "Allow",
+        Action   = ["textract:GetDocumentTextDetection"],
+        Resource = "*"
+      }
+    ]
+  })
 }
 resource "aws_iam_role_policy_attachment" "textract_check_status_logging" {
   role       = aws_iam_role.textract_check_status.name
@@ -192,28 +197,29 @@ resource "aws_iam_role_policy_attachment" "textract_check_status_logging" {
 resource "aws_iam_role" "textract_get_results" {
   name               = "TextractGetResultsLambdaRole${local.env_suffix}"
   assume_role_policy = data.aws_iam_policy_document.lambda_assume_role.json
+}
 
-  inline_policy {
-    name = "TextractGetResultsPolicy"
-    policy = jsonencode({
-      Version = "2012-10-17",
-      Statement = [
-        { # Get the results
-          Effect   = "Allow",
-          Action   = ["textract:GetDocumentTextDetection"],
-          Resource = "*"
-        },
-        { # Write results and delete the temp file in processing bucket
-          Effect   = "Allow",
-          Action   = [
-            "s3:PutObject",
-            "s3:DeleteObject"
-          ],
-          Resource = "${aws_s3_bucket.processing.arn}/*"
-        }
-      ]
-    })
-  }
+resource "aws_iam_role_policy" "textract_get_results_inline" {
+  name = "TextractGetResultsPolicy"
+  role = aws_iam_role.textract_get_results.id
+  policy = jsonencode({
+    Version = "2012-10-17",
+    Statement = [
+      { # Get the results
+        Effect   = "Allow",
+        Action   = ["textract:GetDocumentTextDetection"],
+        Resource = "*"
+      },
+      { # Write results and delete the temp file in processing bucket
+        Effect   = "Allow",
+        Action   = [
+          "s3:PutObject",
+          "s3:DeleteObject"
+        ],
+        Resource = "${aws_s3_bucket.processing.arn}/*"
+      }
+    ]
+  })
 }
 resource "aws_iam_role_policy_attachment" "textract_get_results_logging" {
   role       = aws_iam_role.textract_get_results.name
@@ -246,19 +252,21 @@ resource "aws_iam_policy" "bedrock_analyzer_policy" {
 resource "aws_iam_role" "extract_legal_claims" {
   name               = "ExtractLegalClaimsLambdaRole${local.env_suffix}"
   assume_role_policy = data.aws_iam_policy_document.lambda_assume_role.json
-  inline_policy {
-    name = "ExtractLegalClaimsS3Read"
-    policy = jsonencode({
-      Version = "2012-10-17",
-      Statement = [
-        {
-          Effect   = "Allow",
-          Action   = ["s3:GetObject"],
-          Resource = "${aws_s3_bucket.processing.arn}/*"
-        }
-      ]
-    })
-  }
+}
+
+resource "aws_iam_role_policy" "extract_legal_claims_inline" {
+  name = "ExtractLegalClaimsS3Read"
+  role = aws_iam_role.extract_legal_claims.id
+  policy = jsonencode({
+    Version = "2012-10-17",
+    Statement = [
+      {
+        Effect   = "Allow",
+        Action   = ["s3:GetObject"],
+        Resource = "${aws_s3_bucket.processing.arn}/*"
+      }
+    ]
+  })
 }
 resource "aws_iam_role_policy_attachment" "extract_legal_claims_logging" {
   role       = aws_iam_role.extract_legal_claims.name
@@ -273,19 +281,21 @@ resource "aws_iam_role_policy_attachment" "extract_legal_claims_bedrock" {
 resource "aws_iam_role" "extract_witnesses" {
   name               = "ExtractWitnessesLambdaRole${local.env_suffix}"
   assume_role_policy = data.aws_iam_policy_document.lambda_assume_role.json
-  inline_policy {
-    name = "ExtractWitnessesS3Read"
-    policy = jsonencode({
-      Version = "2012-10-17",
-      Statement = [
-        {
-          Effect   = "Allow",
-          Action   = ["s3:GetObject"],
-          Resource = "${aws_s3_bucket.processing.arn}/*"
-        }
-      ]
-    })
-  }
+}
+
+resource "aws_iam_role_policy" "extract_witnesses_inline" {
+  name = "ExtractWitnessesS3Read"
+  role = aws_iam_role.extract_witnesses.id
+  policy = jsonencode({
+    Version = "2012-10-17",
+    Statement = [
+      {
+        Effect   = "Allow",
+        Action   = ["s3:GetObject"],
+        Resource = "${aws_s3_bucket.processing.arn}/*"
+      }
+    ]
+  })
 }
 resource "aws_iam_role_policy_attachment" "extract_witnesses_logging" {
   role       = aws_iam_role.extract_witnesses.name
@@ -300,19 +310,21 @@ resource "aws_iam_role_policy_attachment" "extract_witnesses_bedrock" {
 resource "aws_iam_role" "extract_case_facts" {
   name               = "ExtractCaseFactsLambdaRole${local.env_suffix}"
   assume_role_policy = data.aws_iam_policy_document.lambda_assume_role.json
-  inline_policy {
-    name = "ExtractCaseFactsS3Read"
-    policy = jsonencode({
-      Version = "2012-10-17",
-      Statement = [
-        {
-          Effect   = "Allow",
-          Action   = ["s3:GetObject"],
-          Resource = "${aws_s3_bucket.processing.arn}/*"
-        }
-      ]
-    })
-  }
+}
+
+resource "aws_iam_role_policy" "extract_case_facts_inline" {
+  name = "ExtractCaseFactsS3Read"
+  role = aws_iam_role.extract_case_facts.id
+  policy = jsonencode({
+    Version = "2012-10-17",
+    Statement = [
+      {
+        Effect   = "Allow",
+        Action   = ["s3:GetObject"],
+        Resource = "${aws_s3_bucket.processing.arn}/*"
+      }
+    ]
+  })
 }
 resource "aws_iam_role_policy_attachment" "extract_case_facts_logging" {
   role       = aws_iam_role.extract_case_facts.name
@@ -327,19 +339,21 @@ resource "aws_iam_role_policy_attachment" "extract_case_facts_bedrock" {
 resource "aws_iam_role" "enrich_legal_item" {
   name               = "EnrichLegalItemLambdaRole${local.env_suffix}"
   assume_role_policy = data.aws_iam_policy_document.lambda_assume_role.json
-  inline_policy {
-    name = "EnrichLegalItemS3Read"
-    policy = jsonencode({
-      Version = "2012-10-17",
-      Statement = [
-        {
-          Effect   = "Allow",
-          Action   = ["s3:GetObject"],
-          Resource = "${aws_s3_bucket.processing.arn}/*"
-        }
-      ]
-    })
-  }
+}
+
+resource "aws_iam_role_policy" "enrich_legal_item_inline" {
+  name = "EnrichLegalItemS3Read"
+  role = aws_iam_role.enrich_legal_item.id
+  policy = jsonencode({
+    Version = "2012-10-17",
+    Statement = [
+      {
+        Effect   = "Allow",
+        Action   = ["s3:GetObject"],
+        Resource = "${aws_s3_bucket.processing.arn}/*"
+      }
+    ]
+  })
 }
 resource "aws_iam_role_policy_attachment" "enrich_legal_item_logging" {
   role       = aws_iam_role.enrich_legal_item.name
@@ -369,20 +383,21 @@ resource "aws_iam_role_policy_attachment" "generate_instructions_bedrock" {
 resource "aws_iam_role" "job_save_results" {
   name               = "JobSaveResultsLambdaRole${local.env_suffix}"
   assume_role_policy = data.aws_iam_policy_document.lambda_assume_role.json
+}
 
-  inline_policy {
-    name = "JobSaveResultsPolicy"
-    policy = jsonencode({
-      Version = "2012-10-17",
-      Statement = [
-        {
-          Effect   = "Allow",
-          Action   = ["dynamodb:UpdateItem"],
-          Resource = aws_dynamodb_table.jury_instructions.arn
-        }
-      ]
-    })
-  }
+resource "aws_iam_role_policy" "job_save_results_inline" {
+  name = "JobSaveResultsPolicy"
+  role = aws_iam_role.job_save_results.id
+  policy = jsonencode({
+    Version = "2012-10-17",
+    Statement = [
+      {
+        Effect   = "Allow",
+        Action   = ["dynamodb:UpdateItem"],
+        Resource = aws_dynamodb_table.jury_instructions.arn
+      }
+    ]
+  })
 }
 resource "aws_iam_role_policy_attachment" "job_save_results_logging" {
   role       = aws_iam_role.job_save_results.name
@@ -397,20 +412,21 @@ resource "aws_iam_role_policy_attachment" "job_save_results_logging" {
 resource "aws_iam_role" "job_handle_error" {
   name               = "JobHandleErrorLambdaRole${local.env_suffix}"
   assume_role_policy = data.aws_iam_policy_document.lambda_assume_role.json
+}
 
-  inline_policy {
-    name = "JobHandleErrorPolicy"
-    policy = jsonencode({
-      Version = "2012-10-17",
-      Statement = [
-        {
-          Effect   = "Allow",
-          Action   = ["dynamodb:UpdateItem"],
-          Resource = aws_dynamodb_table.jury_instructions.arn
-        }
-      ]
-    })
-  }
+resource "aws_iam_role_policy" "job_handle_error_inline" {
+  name = "JobHandleErrorPolicy"
+  role = aws_iam_role.job_handle_error.id
+  policy = jsonencode({
+    Version = "2012-10-17",
+    Statement = [
+      {
+        Effect   = "Allow",
+        Action   = ["dynamodb:UpdateItem"],
+        Resource = aws_dynamodb_table.jury_instructions.arn
+      }
+    ]
+  })
 }
 resource "aws_iam_role_policy_attachment" "job_handle_error_logging" {
   role       = aws_iam_role.job_handle_error.name
@@ -434,31 +450,31 @@ data "aws_iam_policy_document" "sfn_assume_role" {
 resource "aws_iam_role" "sfn_execution_role" {
   name               = "JuryAppStepFunctionRole${local.env_suffix}"
   assume_role_policy = data.aws_iam_policy_document.sfn_assume_role.json
+}
 
-  # Give it permission to invoke *all* our Lambdas
-  inline_policy {
-    name = "StepFunctionLambdaInvokePolicy"
-    policy = jsonencode({
-      Version = "2012-10-17",
-      Statement = [
-        {
-          Effect   = "Allow",
-          Action   = ["lambda:InvokeFunction"],
-          Resource = [
-            aws_lambda_function.job_start.arn,
-            aws_lambda_function.textract_start.arn,
-            aws_lambda_function.textract_check_status.arn,
-            aws_lambda_function.textract_get_results.arn,
-            aws_lambda_function.extract_legal_claims.arn,
-            aws_lambda_function.extract_witnesses.arn,
-            aws_lambda_function.extract_case_facts.arn,
-            aws_lambda_function.enrich_legal_item.arn,
-            aws_lambda_function.generate_instructions.arn,
-            aws_lambda_function.job_save_results.arn,
-            aws_lambda_function.job_handle_error.arn,
-          ]
-        }
-      ]
-    })
-  }
+resource "aws_iam_role_policy" "sfn_execution_role_inline" {
+  name = "StepFunctionLambdaInvokePolicy"
+  role = aws_iam_role.sfn_execution_role.id
+  policy = jsonencode({
+    Version = "2012-10-17",
+    Statement = [
+      {
+        Effect   = "Allow",
+        Action   = ["lambda:InvokeFunction"],
+        Resource = [
+          aws_lambda_function.job_start.arn,
+          aws_lambda_function.textract_start.arn,
+          aws_lambda_function.textract_check_status.arn,
+          aws_lambda_function.textract_get_results.arn,
+          aws_lambda_function.extract_legal_claims.arn,
+          aws_lambda_function.extract_witnesses.arn,
+          aws_lambda_function.extract_case_facts.arn,
+          aws_lambda_function.enrich_legal_item.arn,
+          aws_lambda_function.generate_instructions.arn,
+          aws_lambda_function.job_save_results.arn,
+          aws_lambda_function.job_handle_error.arn,
+        ]
+      }
+    ]
+  })
 }
