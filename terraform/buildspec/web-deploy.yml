@@ -1,66 +1,30 @@
 version: 0.2
-env:
-  variables:
-    AWS_DEFAULT_REGION: us-east-1
 phases:
   install:
+    runtime-versions:
+      nodejs: 18
     commands:
+      - echo Ensuring AWS CLI uses CodeBuild region...
+      - export AWS_DEFAULT_REGION=${AWS_DEFAULT_REGION:-$CODEBUILD_REGION}
       - echo Selecting web source directory...
-      - |
-        # Prefer the WebSource artifact if present, else use primary
-        if [ -n "$CODEBUILD_SRC_DIR_WebSourceArtifact" ]; then
-          WEB_SRC_DIR="$CODEBUILD_SRC_DIR_WebSourceArtifact"
-        else
-          WEB_SRC_DIR="$CODEBUILD_SRC_DIR"
-        fi
-        echo "Using WEB_SRC_DIR=$WEB_SRC_DIR"
-        cd "$WEB_SRC_DIR"
+      - >
+        if [ -n "$CODEBUILD_SRC_DIR_WebSourceArtifact" ]; then WEB_SRC_DIR="$CODEBUILD_SRC_DIR_WebSourceArtifact"; else WEB_SRC_DIR="$CODEBUILD_SRC_DIR"; fi; echo "Using WEB_SRC_DIR=$WEB_SRC_DIR"; cd "$WEB_SRC_DIR"
       - echo Installing Node.js dependencies...
-      - |
-        if [ -f package-lock.json ]; then
-          npm ci
-        else
-          npm install
-        fi
+      - >
+        if [ -f package-lock.json ]; then npm ci; else npm install; fi
   build:
     commands:
       - echo Building frontend...
-      - |
-        if npm run | grep -q " build"; then
-          npm run build
-        else
-          echo "No build script in package.json" && exit 1
-        fi
+      - >
+        if npm run | grep -q " build"; then npm run build; else echo "No build script in package.json" && exit 1; fi
   post_build:
     commands:
       - echo Uploading to S3 bucket: $WEB_S3_BUCKET
-      - |
-        if [ -z "$WEB_BUILD_DIR" ]; then WEB_BUILD_DIR=dist; fi
-        if [ ! -d "$WEB_BUILD_DIR" ]; then echo "Build dir '$WEB_BUILD_DIR' not found" && exit 1; fi
-      - |
-        # Upload immutable assets with long cache
-        aws s3 sync "$WEB_BUILD_DIR/" "s3://$WEB_S3_BUCKET/" \
-          --delete \
-          --cache-control "public, max-age=31536000, immutable" \
-          --exclude "*" \
-          --include "*.js" --include "*.css" --include "*.png" --include "*.jpg" \
-          --include "*.svg" --include "*.webp" --include "*.gif" --include "*.ico" \
-          --include "assets/*" --include "static/*"
-      - |
-        # Upload HTML and root files with no-cache
-        aws s3 sync "$WEB_BUILD_DIR/" "s3://$WEB_S3_BUCKET/" \
-          --cache-control "no-cache" \
-          --exclude "*" \
-          --include "*.html" --include "index.html" --include "404.html" \
-          --include "favicon.ico" --include "site.webmanifest" --include "robots.txt"
-      - |
-        if [ -n "$WEB_CF_DISTRIBUTION_ID" ]; then
-          echo Creating CloudFront invalidation on $WEB_CF_DISTRIBUTION_ID
-          aws cloudfront create-invalidation --distribution-id "$WEB_CF_DISTRIBUTION_ID" --paths "/*"
-        else
-          echo "WEB_CF_DISTRIBUTION_ID not set; skipping invalidation"
-        fi
-artifacts:
-  files:
-    - '**/*'
-  base-directory: $WEB_BUILD_DIR
+      - >
+        WEB_BUILD_DIR=${WEB_BUILD_DIR:-dist}; if [ ! -d "$WEB_BUILD_DIR" ]; then echo "Build dir '$WEB_BUILD_DIR' not found" && exit 1; fi
+      - >
+        aws s3 sync "$WEB_BUILD_DIR/" "s3://$WEB_S3_BUCKET/" --delete --cache-control "public, max-age=31536000, immutable" --exclude "*" --include "*.js" --include "*.css" --include "*.png" --include "*.jpg" --include "*.svg" --include "*.webp" --include "*.gif" --include "*.ico" --include "assets/*" --include "static/*"
+      - >
+        aws s3 sync "$WEB_BUILD_DIR/" "s3://$WEB_S3_BUCKET/" --cache-control "no-cache" --exclude "*" --include "*.html" --include "index.html" --include "404.html" --include "favicon.ico" --include "site.webmanifest" --include "robots.txt"
+      - >
+        if [ -n "$WEB_CF_DISTRIBUTION_ID" ]; then echo Creating CloudFront invalidation on $WEB_CF_DISTRIBUTION_ID; aws cloudfront create-invalidation --distribution-id "$WEB_CF_DISTRIBUTION_ID" --paths "/*"; else echo "WEB_CF_DISTRIBUTION_ID not set; skipping invalidation"; fi
