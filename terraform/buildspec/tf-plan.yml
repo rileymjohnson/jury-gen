@@ -1,7 +1,4 @@
 version: 0.2
-env:
-  variables:
-    AWS_DEFAULT_REGION: us-east-1
 phases:
   install:
     commands:
@@ -28,9 +25,10 @@ phases:
       - IMAGE_TAGS=$(cat "$IMAGE_JSON")
       - cp "$IMAGE_JSON" ./images.json
       - TGR_TAG=$(echo $IMAGE_TAGS | jq -r '.textract_get_results')
+      - EXP_TAG=$(echo $IMAGE_TAGS | jq -r '.api_export_docx')
       - echo "Using environment $TF_ENV"
       - terraform -chdir=terraform/environments/$TF_ENV init -input=false
-      - terraform -chdir=terraform/environments/$TF_ENV plan -out=tfplan -input=false -var="textract_get_results_tag=$TGR_TAG"
+      - terraform -chdir=terraform/environments/$TF_ENV plan -out=tfplan -input=false -var="textract_get_results_tag=$TGR_TAG" -var="api_export_docx_tag=$EXP_TAG"
       - mkdir -p terraform
       - cp -f terraform/environments/$TF_ENV/tfplan terraform/tfplan
 artifacts:

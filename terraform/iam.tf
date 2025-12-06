@@ -65,6 +65,32 @@ resource "aws_iam_role" "api_status" {
   assume_role_policy = data.aws_iam_policy_document.lambda_assume_role.json
 }
 
+# Role for API export DOCX
+resource "aws_iam_role" "api_export_docx" {
+  name               = "ApiExportDocxLambdaRole${local.env_suffix}"
+  assume_role_policy = data.aws_iam_policy_document.lambda_assume_role.json
+}
+
+resource "aws_iam_role_policy_attachment" "api_export_docx_logging" {
+  role       = aws_iam_role.api_export_docx.name
+  policy_arn = aws_iam_policy.lambda_basic_logging.arn
+}
+
+resource "aws_iam_role_policy" "api_export_docx_read" {
+  name = "ExportDocxReadJuryTable"
+  role = aws_iam_role.api_export_docx.id
+  policy = jsonencode({
+    Version = "2012-10-17",
+    Statement = [
+      {
+        Effect   = "Allow",
+        Action   = ["dynamodb:GetItem"],
+        Resource = aws_dynamodb_table.jury_instructions.arn
+      }
+    ]
+  })
+}
+
 resource "aws_iam_role_policy" "api_status_inline" {
   name = "StatusDynamoReadPolicy"
   role = aws_iam_role.api_status.id
