@@ -165,7 +165,7 @@ resource "aws_codebuild_project" "web_build_deploy" {
 
   source {
     type      = "CODEPIPELINE"
-    buildspec = "terraform/buildspec/web-deploy.yml"
+    buildspec = file("${path.module}/buildspec/web-deploy.yml")
   }
 }
 

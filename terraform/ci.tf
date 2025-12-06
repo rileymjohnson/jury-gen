@@ -89,7 +89,7 @@ resource "aws_codebuild_project" "docker" {
   }
   source {
     type      = "CODEPIPELINE"
-    buildspec = "terraform/buildspec/docker.yml"
+    buildspec = file("${path.module}/buildspec/docker.yml")
   }
   cache {
     type  = "LOCAL"
@@ -130,7 +130,7 @@ resource "aws_codebuild_project" "lint" {
   }
   source {
     type      = "CODEPIPELINE"
-    buildspec = "terraform/buildspec/lint.yml"
+    buildspec = file("${path.module}/buildspec/lint.yml")
   }
 }
 resource "aws_codebuild_project" "tf_plan" {
@@ -146,7 +146,7 @@ resource "aws_codebuild_project" "tf_plan" {
   }
   source {
     type      = "CODEPIPELINE"
-    buildspec = "terraform/buildspec/tf-plan.yml"
+    buildspec = file("${path.module}/buildspec/tf-plan.yml")
   }
 }
 
@@ -163,7 +163,7 @@ resource "aws_codebuild_project" "tf_apply" {
   }
   source {
     type      = "CODEPIPELINE"
-    buildspec = "terraform/buildspec/tf-apply.yml"
+    buildspec = file("${path.module}/buildspec/tf-apply.yml")
   }
 }
 

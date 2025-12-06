@@ -5,6 +5,16 @@ env:
 phases:
   install:
     commands:
+      - echo Selecting web source directory...
+      - |
+        # Prefer the WebSource artifact if present, else use primary
+        if [ -n "$CODEBUILD_SRC_DIR_WebSourceArtifact" ]; then
+          WEB_SRC_DIR="$CODEBUILD_SRC_DIR_WebSourceArtifact"
+        else
+          WEB_SRC_DIR="$CODEBUILD_SRC_DIR"
+        fi
+        echo "Using WEB_SRC_DIR=$WEB_SRC_DIR"
+        cd "$WEB_SRC_DIR"
       - echo Installing Node.js dependencies...
       - |
         if [ -f package-lock.json ]; then
