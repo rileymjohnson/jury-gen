@@ -455,7 +455,7 @@ Instructions:
 - Resolve bracketed alternatives [like this] to the most appropriate single choice; remove unused brackets entirely.
 - List principal witnesses as full names separated by commas if provided.
 - Do not add extra commentary or headings. Output only the final instruction text.
-"""
+"""  # noqa: E501
 
     body = json.dumps(
         {

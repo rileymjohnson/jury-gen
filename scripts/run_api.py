@@ -75,7 +75,7 @@ def _build_default_config() -> dict[str, Any]:
     }
 
 
-def call_api_start(
+def call_api_start(  # noqa: PLR0913
     base_url: str,
     api_key: str,
     complaint_key: str,
