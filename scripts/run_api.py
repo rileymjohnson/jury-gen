@@ -39,18 +39,56 @@ def upload_file(put_url: str, path: Path, content_type: str = "application/pdf")
     r.raise_for_status()
 
 
+def _build_default_config() -> dict[str, Any]:
+    # Provide sensible defaults for required config fields
+    return {
+        "incident_date": "2024-01-15",
+        "incident_location": "Miami, Florida",
+        "additional_voir_dire_info": "None.",
+        "include_so_help_you_god": True,
+        "judge_name": "Judge Smith",
+        "plaintiff_name": "John Doe",
+        "defendant_name": "Rachel Rowe",
+        "plaintiff_attorney_name": "Alex Parker",
+        "plaintiff_attorney_gender": "male",
+        "defendant_attorney_name": "Morgan Lee",
+        "defendant_attorney_gender": "female",
+        "court_clerk_name": "Taylor Brooks",
+        "court_clerk_gender": "neutral",
+        "court_reporter_name": "Jordan Cruz",
+        "court_reporter_gender": "neutral",
+        "bailiff_name": "Casey Quinn",
+        "bailiff_gender": "neutral",
+        "electronic_device_policy": "A",
+        "permitted_ex_parte_communications": [
+            "juror parking",
+            "location of break areas",
+            "how and when to assemble for duty",
+            "dress",
+            "what personal items can be brought into the courthouse or jury room",
+        ],
+        "has_foreign_language_witnesses": False,
+        # Optional toggles for future use
+        "plaintiff_is_pro_se": False,
+        "defendant_is_pro_se": False,
+        "has_uim_carrier": False,
+    }
+
+
 def call_api_start(
     base_url: str,
     api_key: str,
     complaint_key: str,
     answer_key: str,
-    witness_key: str
+    witness_key: str,
+    config: dict[str, Any],
 ) -> dict[str, Any]:
     url = f"{base_url}/jury/start"
     body = {
         "complaint_key": complaint_key,
         "answer_key": answer_key,
         "witness_key": witness_key,
+        "config": config,
     }
     r = requests.post(url, json=body, headers={"x-api-key": api_key, "Content-Type": "application/json"})
     r.raise_for_status()
@@ -176,7 +214,8 @@ def run(  # noqa: PLR0913, PLR0915
     upload_file(w_info["presigned_url"], witness, w_info.get("content_type", "application/pdf"))
 
     # 3) Start the workflow
-    start_resp = call_api_start(base_url, api_key, c_info["key"], a_info["key"], w_info["key"])
+    config = _build_default_config()
+    start_resp = call_api_start(base_url, api_key, c_info["key"], a_info["key"], w_info["key"], config)
     write_json(out_dir / "responses" / "start.json", start_resp)
 
     job_id = start_resp.get("jury_instruction_id")

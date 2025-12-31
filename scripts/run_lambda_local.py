@@ -200,6 +200,40 @@ def collect_input_files(lambda_name: str, example: str, ensure: bool, default_al
     return files
 
 
+def _default_config() -> dict:
+    return {
+        "incident_date": "2024-01-15",
+        "incident_location": "Miami, Florida",
+        "additional_voir_dire_info": "None.",
+        "include_so_help_you_god": True,
+        "judge_name": "Judge Smith",
+        "plaintiff_name": "John Doe",
+        "defendant_name": "Rachel Rowe",
+        "plaintiff_attorney_name": "Alex Parker",
+        "plaintiff_attorney_gender": "male",
+        "defendant_attorney_name": "Morgan Lee",
+        "defendant_attorney_gender": "female",
+        "court_clerk_name": "Taylor Brooks",
+        "court_clerk_gender": "neutral",
+        "court_reporter_name": "Jordan Cruz",
+        "court_reporter_gender": "neutral",
+        "bailiff_name": "Casey Quinn",
+        "bailiff_gender": "neutral",
+        "electronic_device_policy": "A",
+        "permitted_ex_parte_communications": [
+            "juror parking",
+            "location of break areas",
+            "how and when to assemble for duty",
+            "dress",
+            "what personal items can be brought into the courthouse or jury room",
+        ],
+        "has_foreign_language_witnesses": False,
+        "plaintiff_is_pro_se": False,
+        "defendant_is_pro_se": False,
+        "has_uim_carrier": False,
+    }
+
+
 def main() -> None:  # noqa: PLR0912, PLR0915
     args = parse_args()
 
@@ -265,6 +299,10 @@ def main() -> None:  # noqa: PLR0912, PLR0915
     for i, file in enumerate(files, start=1):
         with file.open("r", encoding="utf-8") as f:
             payload = json.load(f)
+
+        # Ensure required config for generate_instructions
+        if args.lambda_name == "generate_instructions" and not isinstance(payload.get("config"), dict):
+            payload["config"] = _default_config()
 
         print(f"\n=== RUN {args.lambda_name} :: {file} ===")
         result = handler(payload, None)

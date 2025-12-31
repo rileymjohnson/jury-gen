@@ -23,6 +23,40 @@ LAMBDA_DIR_MAP: dict[str, str] = {
 }
 
 
+def _default_config() -> dict:
+    return {
+        "incident_date": "2024-01-15",
+        "incident_location": "Miami, Florida",
+        "additional_voir_dire_info": "None.",
+        "include_so_help_you_god": True,
+        "judge_name": "Judge Smith",
+        "plaintiff_name": "John Doe",
+        "defendant_name": "Rachel Rowe",
+        "plaintiff_attorney_name": "Alex Parker",
+        "plaintiff_attorney_gender": "male",
+        "defendant_attorney_name": "Morgan Lee",
+        "defendant_attorney_gender": "female",
+        "court_clerk_name": "Taylor Brooks",
+        "court_clerk_gender": "neutral",
+        "court_reporter_name": "Jordan Cruz",
+        "court_reporter_gender": "neutral",
+        "bailiff_name": "Casey Quinn",
+        "bailiff_gender": "neutral",
+        "electronic_device_policy": "A",
+        "permitted_ex_parte_communications": [
+            "juror parking",
+            "location of break areas",
+            "how and when to assemble for duty",
+            "dress",
+            "what personal items can be brought into the courthouse or jury room",
+        ],
+        "has_foreign_language_witnesses": False,
+        "plaintiff_is_pro_se": False,
+        "defendant_is_pro_se": False,
+        "has_uim_carrier": False,
+    }
+
+
 def infer_region_from_history(example: str) -> str | None:
     history = Path("examples") / example / "sfn_events.json"
     if not history.exists():
@@ -264,6 +298,8 @@ def main():  # noqa: PLR0912, PLR0915
                 with st.expander(f"{i:03d} – {path.name}", expanded=False):  # noqa: RUF001
                     st.write("Input")
                     payload = load_json(path)
+                    if lambda_name == "generate_instructions" and not isinstance(payload.get("config"), dict):
+                        payload["config"] = _default_config()
                     st.json(payload)
                     try:
                         log_box = st.empty()
@@ -298,6 +334,8 @@ def main():  # noqa: PLR0912, PLR0915
                         "DYNAMODB_STANDARD_JURY_INSTRUCTIONS_TABLE_NAME", "StandardJuryInstructions-dev"
                     )
                 payload = load_json(selected)
+                if lambda_name == "generate_instructions" and not isinstance(payload.get("config"), dict):
+                    payload["config"] = _default_config()
                 try:
                     log_box = st.empty()
                     status = st.empty()

@@ -396,7 +396,9 @@ resource "aws_sfn_state_machine" "jury_app_workflow" {
         "Parameters": {
           "claims.$": "$.claims",
           "counterclaims.$": "$.counterclaims",
-          "case_facts.$": "$.case_facts"
+          "case_facts.$": "$.case_facts",
+          "witnesses.$": "$.witnesses",
+          "config.$": "$.job_data.config"
         },
         "Catch": [
           {

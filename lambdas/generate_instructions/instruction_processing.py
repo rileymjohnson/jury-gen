@@ -407,8 +407,131 @@ Each instruction should be a separate item in the array."""  # noqa: E501
     return []
 
 
-def generate_instructions(claims, counterclaims, case_facts):
-    all_400_instructions = []
+def _get_instruction_by_number(number: str):
+    """Fetch a single standard instruction by its number (e.g., '201.1')."""
+    try:
+        resp = _sji_table.scan(FilterExpression=Attr("number").eq(number))
+        items = resp.get("Items", [])
+        if items:
+            # In case of multiple versions, pick the one with matching number and first in list
+            return items[0]
+    except Exception:
+        pass
+    return None
+
+
+def _llm_render_instruction(template_text: str, inputs: dict) -> str:
+    """Ask Bedrock to render a filled instruction from a template and inputs."""
+    tools = [
+        {
+            "name": "render_instruction",
+            "description": "Fill a Florida SJI template with provided inputs; return finalized text",
+            "input_schema": {
+                "type": "object",
+                "properties": {
+                    "customized_text": {
+                        "type": "string",
+                        "description": "The final instruction text with placeholders filled and brackets resolved",
+                    }
+                },
+                "required": ["customized_text"],
+            },
+        }
+    ]
+
+    # Keep prompt explicit to preserve SJI style
+    prompt = f"""You are producing a finalized Florida Standard Jury Instruction by resolving a provided template.
+
+TEMPLATE:
+{template_text}
+
+INPUTS (JSON):
+{json.dumps(inputs, indent=2)}
+
+Instructions:
+- Keep the structure and language of the template.
+- Replace parenthetical placeholders like (date), (location), and similar with provided values.
+- Where the template says to insert a brief description of claims/defenses, write a single clear sentence suitable for voir dire using the case_facts and party names.
+- Resolve bracketed alternatives [like this] to the most appropriate single choice; remove unused brackets entirely.
+- List principal witnesses as full names separated by commas if provided.
+- Do not add extra commentary or headings. Output only the final instruction text.
+"""
+
+    body = json.dumps(
+        {
+            "anthropic_version": "bedrock-2023-05-31",
+            "max_tokens": 2000,
+            "tools": tools,
+            "tool_choice": {"type": "tool", "name": "render_instruction"},
+            "messages": [{"role": "user", "content": prompt}],
+        }
+    )
+
+    response = bedrock.invoke_model(
+        body=body,
+        modelId="us.anthropic.claude-3-5-sonnet-20241022-v2:0",
+        accept="application/json",
+        contentType="application/json",
+    )
+
+    response_body = json.loads(response.get("body").read())
+    for item in response_body.get("content", []):
+        if item.get("type") == "tool_use":
+            return item["input"].get("customized_text", "")
+    return ""
+
+
+def _generate_201_1(config: dict, case_facts: str, witnesses: list[dict]):
+    inst = _get_instruction_by_number("201.1")
+    if not inst:
+        return None
+
+    # Prepare inputs
+    witness_names = []
+    for w in witnesses or []:
+        first = (w or {}).get("first_name") or ""
+        last = (w or {}).get("last_name") or ""
+        name = (first + " " + last).strip()
+        if name:
+            witness_names.append(name)
+
+    inputs = {
+        "case_facts": case_facts or "",
+        "plaintiff_name": config.get("plaintiff_name"),
+        "defendant_name": config.get("defendant_name"),
+        "incident_date": config.get("incident_date"),
+        "incident_location": config.get("incident_location"),
+        "additional_voir_dire_info": config.get("additional_voir_dire_info"),
+        "principal_witnesses": witness_names,
+    }
+
+    rendered = _llm_render_instruction(template_text=inst.get("main_paragraph", ""), inputs=inputs)
+    if not rendered:
+        return None
+
+    return {
+        "number": inst.get("number"),
+        "title": inst.get("title"),
+        "customized_text": rendered,
+    }
+
+
+def generate_instructions(claims, counterclaims, case_facts, witnesses=None, config=None):
+    # Config can carry toggles and metadata for 100/200/600 series, etc.
+    if not isinstance(config, dict):
+        config = {}
+    witnesses = witnesses or []
+
+    all_instructions = []
+
+    # 201.1 should go first
+    try:
+        inst_201_1 = _generate_201_1(config=config, case_facts=case_facts, witnesses=witnesses)
+        if inst_201_1:
+            all_instructions.append(inst_201_1)
+    except Exception:
+        # Don't fail the whole job if 201.1 generation fails
+        pass
 
     custom_claims = []
     custom_counterclaims = []
@@ -441,7 +564,7 @@ def generate_instructions(claims, counterclaims, case_facts):
                 defenses=claim_info.get("defenses", []),
                 case_facts=case_facts,
             )
-            all_400_instructions.extend(selected_instructions)
+            all_instructions.extend(selected_instructions)
         else:
             custom_claims.append(claim_info)
 
@@ -463,7 +586,7 @@ def generate_instructions(claims, counterclaims, case_facts):
                 defenses=[],  # Counterclaims don't have defenses from plaintiff
                 case_facts=case_facts,
             )
-            all_400_instructions.extend(selected_instructions)
+            all_instructions.extend(selected_instructions)
         else:
             custom_counterclaims.append(counterclaim_info)
 
@@ -473,6 +596,6 @@ def generate_instructions(claims, counterclaims, case_facts):
         claim = database_get_claim_by_id(claim_info["claim_id"])
 
         custom_instructions = generate_custom_instructions(claim_info=claim_info, claim=claim, case_facts=case_facts)
-        all_400_instructions.extend(custom_instructions)
+        all_instructions.extend(custom_instructions)
 
-    return all_400_instructions
+    return all_instructions

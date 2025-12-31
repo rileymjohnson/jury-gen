@@ -34,6 +34,9 @@ def lambda_handler(event, context):
     try:
         job_id = event["jury_instruction_id"]
         files = event["files"]
+        config = event.get("config")
+        if not isinstance(config, dict):
+            raise ValueError("'config' is required and must be an object")
         if not job_id:
             raise KeyError("Input event must contain 'jury_instruction_id'")
         if not files:
@@ -51,6 +54,7 @@ def lambda_handler(event, context):
         "status": "PROCESSING",
         "createdAt": created_at,
         "source_files": files,  # Store the input file paths
+        "config": config,
     }
 
     try:
@@ -61,7 +65,7 @@ def lambda_handler(event, context):
 
         # Return the provided job_id so the Step Function and downstream tasks
         # can correlate updates and results.
-        return {"jury_instruction_id": job_id, "files": files}
+        return {"jury_instruction_id": job_id, "files": files, "config": config}
         # -----------------------------
 
     except Exception as e:

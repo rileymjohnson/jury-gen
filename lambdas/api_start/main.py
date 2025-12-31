@@ -39,6 +39,10 @@ def lambda_handler(event, context):
         complaint_key = payload.get("complaint_key")
         answer_key = payload.get("answer_key")
         witness_key = payload.get("witness_key")
+        # Required configuration object to control instruction generation
+        config = payload.get("config") if isinstance(payload, dict) else None
+        if not isinstance(config, dict):
+            return _response(400, {"error": "'config' is required and must be an object"})
 
         if not all(isinstance(x, str) and x for x in [complaint_key, answer_key, witness_key]):
             return _response(400, {"error": "'complaint_key', 'answer_key', and 'witness_key' are required"})
@@ -55,6 +59,7 @@ def lambda_handler(event, context):
         input_obj = {
             "jury_instruction_id": jury_instruction_id,
             "files": files,
+            "config": config,
         }
 
         resp = sfn.start_execution(
