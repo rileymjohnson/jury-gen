@@ -420,8 +420,16 @@ def _get_instruction_by_number(number: str):
     return None
 
 
-def _llm_render_instruction(template_text: str, inputs: dict) -> str:
-    """Ask Bedrock to render a filled instruction from a template and inputs."""
+def _llm_render_instruction(
+    template_text: str,
+    inputs: dict,
+    render_hint: str | None = None,
+    extra_instructions: str | None = None,
+) -> str:
+    """Ask Bedrock to render a filled instruction from a template and inputs.
+
+    render_hint may constrain the output (e.g., 'pre-oath' or 'post-oath').
+    """
     tools = [
         {
             "name": "render_instruction",
@@ -440,6 +448,25 @@ def _llm_render_instruction(template_text: str, inputs: dict) -> str:
     ]
 
     # Keep prompt explicit to preserve SJI style
+    hint_text = ""
+    if render_hint == "pre-oath":
+        hint_text = (
+            "Output only the pre-oath portion that culminates in the oath being administered. "
+            "End the output with the sentence about administering the oath."
+        )
+    elif render_hint == "post-oath":
+        hint_text = (
+            "Output only the continuation that follows the oath, beginning with the post-oath language."
+        )
+    elif render_hint == "201.2":
+        hint_text = (
+            "Resolve bracketed pronouns for each role using the provided pronouns. "
+            "Include or omit the self-represented (pro se) paragraphs based on inputs. "
+            "Include the uninsured/underinsured motorist carrier paragraph only if has_uim_carrier is true and fill in the carrier name. "
+            "If electronic_device_policy is provided, apply the corresponding admonition if present in the template. "
+            "If permitted_ex_parte_communications are provided, reflect them as appropriate in the communications guidance."
+        )
+
     prompt = f"""You are producing a finalized Florida Standard Jury Instruction by resolving a provided template.
 
 TEMPLATE:
@@ -453,8 +480,11 @@ Instructions:
 - Replace parenthetical placeholders like (date), (location), and similar with provided values.
 - Where the template says to insert a brief description of claims/defenses, write a single clear sentence suitable for voir dire using the case_facts and party names.
 - Resolve bracketed alternatives [like this] to the most appropriate single choice; remove unused brackets entirely.
+- If the template includes "[I] [The clerk] will now administer your oath.", choose "I" when inputs.oath_administered_by == "judge" and choose "The clerk" when inputs.oath_administered_by == "clerk".
 - List principal witnesses as full names separated by commas if provided.
 - Do not add extra commentary or headings. Output only the final instruction text.
+ {hint_text}
+ {extra_instructions or ''}
 """  # noqa: E501
 
     body = json.dumps(
@@ -503,16 +533,263 @@ def _generate_201_1(config: dict, case_facts: str, witnesses: list[dict]):
         "incident_location": config.get("incident_location"),
         "additional_voir_dire_info": config.get("additional_voir_dire_info"),
         "principal_witnesses": witness_names,
+        "oath_administered_by": (config.get("oath_administered_by") or "clerk").lower(),
     }
 
-    rendered = _llm_render_instruction(template_text=inst.get("main_paragraph", ""), inputs=inputs)
-    if not rendered:
+    # If oath will be administered, render pre/post segments; otherwise render a single combined instruction
+    include_oath = bool(config.get("include_so_help_you_god", False))
+
+    results = []
+    if include_oath:
+        pre_text = _llm_render_instruction(
+            template_text=inst.get("main_paragraph", ""), inputs=inputs, render_hint="pre-oath"
+        )
+        post_text = _llm_render_instruction(
+            template_text=inst.get("main_paragraph", ""), inputs=inputs, render_hint="post-oath"
+        )
+        if pre_text:
+            results.append(
+                {
+                    "number": inst.get("number"),
+                    "title": inst.get("title"),
+                    "customized_text": pre_text,
+                    "meta": {"is_continuation_part": False},
+                }
+            )
+        if post_text:
+            results.append(
+                {
+                    "number": inst.get("number"),
+                    "title": inst.get("title"),
+                    "customized_text": post_text,
+                    "meta": {"is_continuation_part": True},
+                }
+            )
+    else:
+        combined = _llm_render_instruction(template_text=inst.get("main_paragraph", ""), inputs=inputs)
+        if combined:
+            results.append(
+                {
+                    "number": inst.get("number"),
+                    "title": inst.get("title"),
+                    "customized_text": combined,
+                    "meta": {"is_continuation_part": False},
+                }
+            )
+
+    return results if results else None
+
+
+def _pronouns_for(gender: str | None) -> dict:
+    g = (gender or "neutral").lower()
+    if g == "male":
+        return {"subject": "he", "object": "him", "possessive_adj": "his", "reflexive": "himself"}
+    if g == "female":
+        return {"subject": "she", "object": "her", "possessive_adj": "her", "reflexive": "herself"}
+    # default neutral
+    return {"subject": "they", "object": "them", "possessive_adj": "their", "reflexive": "themself"}
+
+
+def _generate_201_2(config: dict):
+    inst = _get_instruction_by_number("201.2")
+    if not inst:
         return None
 
+    inputs = {
+        "judge_name": config.get("judge_name"),
+        "plaintiff_name": config.get("plaintiff_name"),
+        "defendant_name": config.get("defendant_name"),
+        "plaintiff_attorney_name": config.get("plaintiff_attorney_name"),
+        "plaintiff_attorney_pronouns": _pronouns_for(config.get("plaintiff_attorney_gender")),
+        "defendant_attorney_name": config.get("defendant_attorney_name"),
+        "defendant_attorney_pronouns": _pronouns_for(config.get("defendant_attorney_gender")),
+        "court_clerk_name": config.get("court_clerk_name"),
+        "court_clerk_pronouns": _pronouns_for(config.get("court_clerk_gender")),
+        "court_reporter_name": config.get("court_reporter_name"),
+        "court_reporter_pronouns": _pronouns_for(config.get("court_reporter_gender")),
+        "bailiff_name": config.get("bailiff_name"),
+        "bailiff_pronouns": _pronouns_for(config.get("bailiff_gender")),
+        "plaintiff_is_pro_se": bool(config.get("plaintiff_is_pro_se", False)),
+        "defendant_is_pro_se": bool(config.get("defendant_is_pro_se", False)),
+        "has_uim_carrier": bool(config.get("has_uim_carrier", False)),
+        "uim_carrier_name": config.get("uim_carrier_name"),
+        "electronic_device_policy": config.get("electronic_device_policy"),
+        "permitted_ex_parte_communications": config.get("permitted_ex_parte_communications", []),
+    }
+
+    extra = (
+        "When resolving bracketed pronouns like [His] [Her] or [he] [she], use the provided *_pronouns fields. "
+        "If plaintiff_is_pro_se is true, include the pro se plaintiff paragraph and omit the counsel paragraph. "
+        "If defendant_is_pro_se is true, include the pro se defendant paragraph and omit the counsel paragraph. "
+        "Include the uninsured/underinsured motorist carrier paragraph only if has_uim_carrier is true, and insert uim_carrier_name. "
+        "If electronic_device_policy is 'A' or 'B', choose the corresponding policy if present. "
+        "If permitted_ex_parte_communications is non-empty, incorporate those topics where the template allows."
+    )
+
+    text = _llm_render_instruction(
+        template_text=inst.get("main_paragraph", ""), inputs=inputs, render_hint="201.2", extra_instructions=extra
+    )
+    if not text:
+        return None
     return {
         "number": inst.get("number"),
         "title": inst.get("title"),
-        "customized_text": rendered,
+        "customized_text": text,
+    }
+
+
+def _generate_201_3():
+    inst = _get_instruction_by_number("201.3")
+    if not inst:
+        return None
+
+    # No dynamic inputs needed; let LLM resolve any bracketed variants.
+    text = _llm_render_instruction(template_text=inst.get("main_paragraph", ""), inputs={})
+    if not text:
+        return None
+    return {
+        "number": inst.get("number"),
+        "title": inst.get("title"),
+        "customized_text": text,
+    }
+
+
+def _generate_101_1(config: dict):
+    inst = _get_instruction_by_number("101.1")
+    if not inst:
+        return None
+
+    inputs = {
+        "include_so_help_you_god": bool(config.get("include_so_help_you_god", False)),
+    }
+
+    text = _llm_render_instruction(template_text=inst.get("main_paragraph", ""), inputs=inputs)
+    if not text:
+        return None
+    return {
+        "number": inst.get("number"),
+        "title": inst.get("title"),
+        "customized_text": text,
+    }
+
+
+def _generate_601_1():
+    inst = _get_instruction_by_number("601.1")
+    if not inst:
+        return None
+
+    text = _llm_render_instruction(template_text=inst.get("main_paragraph", ""), inputs={})
+    if not text:
+        return None
+    return {
+        "number": inst.get("number"),
+        "title": inst.get("title"),
+        "customized_text": text,
+    }
+
+
+def _generate_601_2(config: dict | None = None):
+    """Believability of witnesses (combined a + optional expert section).
+
+    Include expert-witness guidance only when config.has_expert_witnesses is true.
+    """
+    inst = _get_instruction_by_number("601.2")
+    if not inst:
+        return None
+
+    cfg = config or {}
+    inputs = {"has_expert_witnesses": bool(cfg.get("has_expert_witnesses", False))}
+    extra = (
+        "If has_expert_witnesses is false, omit the expert witness subsection (part b) entirely, "
+        "including any bracketed expert-introduction sentences. If true, include part b."
+    )
+    text = _llm_render_instruction(
+        template_text=inst.get("main_paragraph", ""), inputs=inputs, extra_instructions=extra
+    )
+    if not text:
+        return None
+    return {
+        "number": inst.get("number"),
+        "title": inst.get("title"),
+        "customized_text": text,
+    }
+
+
+def _generate_601_3(config: dict):
+    """Official English translation/interpretation — include only when applicable."""
+    if not bool(config.get("has_foreign_language_witnesses", False)):
+        return None
+    inst = _get_instruction_by_number("601.3")
+    if not inst:
+        return None
+
+    # If a language is known in future, it can be supplied via inputs (e.g., language_used)
+    text = _llm_render_instruction(template_text=inst.get("main_paragraph", ""), inputs={})
+    if not text:
+        return None
+    return {
+        "number": inst.get("number"),
+        "title": inst.get("title"),
+        "customized_text": text,
+    }
+
+
+def _generate_601_4(claims: list[dict], counterclaims: list[dict]):
+    """Multiple claims — include when there is more than one claim overall.
+
+    Let Bedrock adapt the template language based on claim titles; avoid
+    manually injecting the '(state the number)' replacement here.
+    """
+    total = len(claims or []) + len(counterclaims or [])
+    if total <= 1:
+        return None
+    inst = _get_instruction_by_number("601.4")
+    if not inst:
+        return None
+
+    # Collect claim titles where available (optional context for the model)
+    names: list[str] = []
+    for ci in (claims or []):
+        c = database_get_claim_by_id(ci.get("claim_id")) if isinstance(ci, dict) else None
+        t = (c or {}).get("title")
+        if isinstance(t, str) and t.strip():
+            names.append(t.strip())
+    for ci in (counterclaims or []):
+        c = database_get_claim_by_id(ci.get("claim_id")) if isinstance(ci, dict) else None
+        t = (c or {}).get("title")
+        if isinstance(t, str) and t.strip():
+            names.append(t.strip())
+
+    inputs = {"claim_titles": names}
+    text = _llm_render_instruction(template_text=inst.get("main_paragraph", ""), inputs=inputs)
+    if not text:
+        return None
+    return {
+        "number": inst.get("number"),
+        "title": inst.get("title"),
+        "customized_text": text,
+    }
+
+
+def _generate_601_5(config: dict):
+    """Concluding instruction (before final argument).
+
+    Include when final_instructions_timing == 'before_final_argument'.
+    """
+    timing = (config or {}).get("final_instructions_timing")
+    if str(timing or "").lower() != "before_final_argument":
+        return None
+    inst = _get_instruction_by_number("601.5")
+    if not inst:
+        return None
+
+    text = _llm_render_instruction(template_text=inst.get("main_paragraph", ""), inputs={})
+    if not text:
+        return None
+    return {
+        "number": inst.get("number"),
+        "title": inst.get("title"),
+        "customized_text": text,
     }
 
 
@@ -524,13 +801,45 @@ def generate_instructions(claims, counterclaims, case_facts, witnesses=None, con
 
     all_instructions = []
 
-    # 201.1 should go first
+    # 201.1 (pre), 101.1 (if enabled), 201.1 (post)
     try:
-        inst_201_1 = _generate_201_1(config=config, case_facts=case_facts, witnesses=witnesses)
-        if inst_201_1:
-            all_instructions.append(inst_201_1)
+        parts_201_1 = _generate_201_1(config=config, case_facts=case_facts, witnesses=witnesses)
+        if parts_201_1:
+            include_oath = bool(config.get("include_so_help_you_god", False))
+            pre = [x for x in parts_201_1 if not (x.get("meta") or {}).get("is_continuation_part")]
+            post = [x for x in parts_201_1 if (x.get("meta") or {}).get("is_continuation_part")]
+
+            if include_oath:
+                # Expect at most one pre and one post; add in sequence with oath between
+                for x in pre:
+                    all_instructions.append(x)
+                oath = _generate_101_1(config=config)
+                if oath:
+                    all_instructions.append(oath)
+                for x in post:
+                    all_instructions.append(x)
+            else:
+                # No oath; just add whatever 201.1 returned (likely a single combined instruction)
+                for x in parts_201_1:
+                    all_instructions.append(x)
     except Exception:
-        # Don't fail the whole job if 201.1 generation fails
+        # Don't fail the whole job if 201.1/101.1 generation fails
+        pass
+
+    # 201.2 Introduction of Participants and Their Roles
+    try:
+        inst_201_2 = _generate_201_2(config=config)
+        if inst_201_2:
+            all_instructions.append(inst_201_2)
+    except Exception:
+        pass
+
+    # 201.3
+    try:
+        inst_201_3 = _generate_201_3()
+        if inst_201_3:
+            all_instructions.append(inst_201_3)
+    except Exception:
         pass
 
     custom_claims = []
@@ -597,5 +906,41 @@ def generate_instructions(claims, counterclaims, case_facts, witnesses=None, con
 
         custom_instructions = generate_custom_instructions(claim_info=claim_info, claim=claim, case_facts=case_facts)
         all_instructions.extend(custom_instructions)
+
+    # 600-series concluding instructions
+    try:
+        si_601_1 = _generate_601_1()
+        if si_601_1:
+            all_instructions.append(si_601_1)
+    except Exception:
+        pass
+
+    try:
+        si_601_2 = _generate_601_2(config=config)
+        if si_601_2:
+            all_instructions.append(si_601_2)
+    except Exception:
+        pass
+
+    try:
+        si_601_3 = _generate_601_3(config=config)
+        if si_601_3:
+            all_instructions.append(si_601_3)
+    except Exception:
+        pass
+
+    try:
+        si_601_4 = _generate_601_4(claims=claims, counterclaims=counterclaims)
+        if si_601_4:
+            all_instructions.append(si_601_4)
+    except Exception:
+        pass
+
+    try:
+        si_601_5 = _generate_601_5(config=config)
+        if si_601_5:
+            all_instructions.append(si_601_5)
+    except Exception:
+        pass
 
     return all_instructions

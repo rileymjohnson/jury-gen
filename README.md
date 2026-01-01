@@ -30,7 +30,7 @@ Local Runner
   - Dev: set `JURY_DEV_API_URL` and `JURY_DEV_API_KEY`
   - Prod: set `JURY_PROD_API_URL` and `JURY_PROD_API_KEY`
 - Run an example end-to-end via the live API:
-  - `python scripts/run_api_example.py one --env dev --api-url https://z8rj47cgo7.execute-api.us-east-1.amazonaws.com/dev --api-key <key>`
+  - `python scripts/run_api.py --example one --env dev --api-url https://z8rj47cgo7.execute-api.us-east-1.amazonaws.com/dev --api-key <key>`
   - Flags `--api-url` and `--api-key` are optional; they default to the provided dev values.
   - Results are written to `runs/dev-one-<timestamp>/`
 
@@ -90,6 +90,12 @@ Local Runner
   - `lambdas/generate_instructions/main.py`:
     - Input: `{ claims: [...], counterclaims: [...], case_facts: "..." }`.
     - Joins with `StandardJuryInstructions-*` to emit tailored instruction objects.
+    - Includes 100s/200s scaffolding and 600s concluding instructions. 600s behavior:
+      - 601.1 always included.
+      - 601.2 combines general witness evaluation and expert guidance; include the expert subsection only when `config.has_expert_witnesses` is true.
+      - 601.3 included when `config.has_foreign_language_witnesses` is true.
+      - 601.4 included when there is more than one claim overall; Bedrock adapts wording based on provided context.
+      - 601.5 included when `config.final_instructions_timing == "before_final_argument"`.
 
 - API (HTTP)
   - `lambdas/api_signer/main.py`: generates pre-signed S3 upload URLs for documents.

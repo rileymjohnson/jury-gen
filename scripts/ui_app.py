@@ -29,6 +29,7 @@ def _default_config() -> dict:
         "incident_location": "Miami, Florida",
         "additional_voir_dire_info": "None.",
         "include_so_help_you_god": True,
+        "oath_administered_by": "clerk",
         "judge_name": "Judge Smith",
         "plaintiff_name": "John Doe",
         "defendant_name": "Rachel Rowe",
@@ -51,9 +52,13 @@ def _default_config() -> dict:
             "what personal items can be brought into the courthouse or jury room",
         ],
         "has_foreign_language_witnesses": False,
+        "has_expert_witnesses": False,
         "plaintiff_is_pro_se": False,
         "defendant_is_pro_se": False,
         "has_uim_carrier": False,
+        # When to give final instructions relative to final argument
+        # Allowed: "before_final_argument" | "after_final_argument"
+        "final_instructions_timing": "before_final_argument",
     }
 
 
