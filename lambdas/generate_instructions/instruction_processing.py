@@ -462,9 +462,9 @@ def _llm_render_instruction(
         hint_text = (
             "Resolve bracketed pronouns for each role using the provided pronouns. "
             "Include or omit the self-represented (pro se) paragraphs based on inputs. "
-            "Include the uninsured/underinsured motorist carrier paragraph only if has_uim_carrier is true and fill in the carrier name. "
+            "Include the uninsured/underinsured motorist carrier paragraph only if has_uim_carrier is true and fill in the carrier name. "  # noqa: E501
             "If electronic_device_policy is provided, apply the corresponding admonition if present in the template. "
-            "If permitted_ex_parte_communications are provided, reflect them as appropriate in the communications guidance."
+            "If permitted_ex_parte_communications are provided, reflect them as appropriate in the communications guidance."  # noqa: E501
         )
 
     prompt = f"""You are producing a finalized Florida Standard Jury Instruction by resolving a provided template.
@@ -621,7 +621,7 @@ def _generate_201_2(config: dict):
         "When resolving bracketed pronouns like [His] [Her] or [he] [she], use the provided *_pronouns fields. "
         "If plaintiff_is_pro_se is true, include the pro se plaintiff paragraph and omit the counsel paragraph. "
         "If defendant_is_pro_se is true, include the pro se defendant paragraph and omit the counsel paragraph. "
-        "Include the uninsured/underinsured motorist carrier paragraph only if has_uim_carrier is true, and insert uim_carrier_name. "
+        "Include the uninsured/underinsured motorist carrier paragraph only if has_uim_carrier is true, and insert uim_carrier_name. "  # noqa: E501
         "If electronic_device_policy is 'A' or 'B', choose the corresponding policy if present. "
         "If permitted_ex_parte_communications is non-empty, incorporate those topics where the template allows."
     )
@@ -793,7 +793,7 @@ def _generate_601_5(config: dict):
     }
 
 
-def generate_instructions(claims, counterclaims, case_facts, witnesses=None, config=None):
+def generate_instructions(claims, counterclaims, case_facts, witnesses=None, config=None):  # noqa: PLR0912, PLR0915
     # Config can carry toggles and metadata for 100/200/600 series, etc.
     if not isinstance(config, dict):
         config = {}
@@ -811,17 +811,14 @@ def generate_instructions(claims, counterclaims, case_facts, witnesses=None, con
 
             if include_oath:
                 # Expect at most one pre and one post; add in sequence with oath between
-                for x in pre:
-                    all_instructions.append(x)
+                all_instructions.extend(pre)
                 oath = _generate_101_1(config=config)
                 if oath:
                     all_instructions.append(oath)
-                for x in post:
-                    all_instructions.append(x)
+                all_instructions.extend(post)
             else:
                 # No oath; just add whatever 201.1 returned (likely a single combined instruction)
-                for x in parts_201_1:
-                    all_instructions.append(x)
+                all_instructions.extend(parts_201_1)
     except Exception:
         # Don't fail the whole job if 201.1/101.1 generation fails
         pass
