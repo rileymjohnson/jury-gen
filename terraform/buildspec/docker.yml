@@ -1,10 +1,8 @@
 version: 0.2
-env:
-  variables:
-    AWS_DEFAULT_REGION: us-east-1
 phases:
   pre_build:
     commands:
+      - export AWS_DEFAULT_REGION=${AWS_DEFAULT_REGION:-$CODEBUILD_REGION}
       - echo Logging in to Amazon ECR...
       - aws ecr get-login-password --region $AWS_DEFAULT_REGION | docker login --username AWS --password-stdin ${ACCOUNT_ID}.dkr.ecr.${AWS_DEFAULT_REGION}.amazonaws.com
       - COMMIT_SHA="$CODEBUILD_RESOLVED_SOURCE_VERSION"
@@ -15,12 +13,15 @@ phases:
     commands:
       - echo Building Docker images...
       - docker build -t jury-app/textract-get-results-$TF_ENV:$SHORT_SHA lambdas/textract_get_results
+      - docker build -t jury-app/api-export-docx-$TF_ENV:$SHORT_SHA lambdas/api_export_docx
   post_build:
     commands:
       - echo Tagging and pushing...
       - docker tag jury-app/textract-get-results-$TF_ENV:$SHORT_SHA ${ACCOUNT_ID}.dkr.ecr.${AWS_DEFAULT_REGION}.amazonaws.com/jury-app/textract-get-results-$TF_ENV:$SHORT_SHA
       - docker push ${ACCOUNT_ID}.dkr.ecr.${AWS_DEFAULT_REGION}.amazonaws.com/jury-app/textract-get-results-$TF_ENV:$SHORT_SHA
-      - printf '{"textract_get_results":"%s"}' "$SHORT_SHA" > images.json
+      - docker tag jury-app/api-export-docx-$TF_ENV:$SHORT_SHA ${ACCOUNT_ID}.dkr.ecr.${AWS_DEFAULT_REGION}.amazonaws.com/jury-app/api-export-docx-$TF_ENV:$SHORT_SHA
+      - docker push ${ACCOUNT_ID}.dkr.ecr.${AWS_DEFAULT_REGION}.amazonaws.com/jury-app/api-export-docx-$TF_ENV:$SHORT_SHA
+      - printf '{"textract_get_results":"%s","api_export_docx":"%s"}' "$SHORT_SHA" "$SHORT_SHA" > images.json
 artifacts:
   files:
     - images.json

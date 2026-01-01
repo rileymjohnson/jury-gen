@@ -47,7 +47,7 @@ resource "aws_iam_role_policy" "cb_docker" {
     Statement = [
       { Effect = "Allow", Action = ["logs:CreateLogGroup", "logs:CreateLogStream", "logs:PutLogEvents"], Resource = "*" },
       { Effect = "Allow", Action = ["ecr:GetAuthorizationToken"], Resource = "*" },
-      { Effect = "Allow", Action = ["ecr:BatchCheckLayerAvailability", "ecr:CompleteLayerUpload", "ecr:InitiateLayerUpload", "ecr:PutImage", "ecr:UploadLayerPart", "ecr:BatchGetImage"], Resource = [aws_ecr_repository.textract_get_results.arn] },
+      { Effect = "Allow", Action = ["ecr:BatchCheckLayerAvailability", "ecr:CompleteLayerUpload", "ecr:InitiateLayerUpload", "ecr:PutImage", "ecr:UploadLayerPart", "ecr:BatchGetImage"], Resource = [aws_ecr_repository.textract_get_results.arn, aws_ecr_repository.api_export_docx.arn] },
       { Effect = "Allow", Action = ["s3:PutObject", "s3:GetObject", "s3:GetObjectVersion"], Resource = ["${aws_s3_bucket.ci_artifacts.arn}/*"] },
       { Effect = "Allow", Action = ["s3:ListBucket"], Resource = [aws_s3_bucket.ci_artifacts.arn] }
     ]
@@ -89,7 +89,7 @@ resource "aws_codebuild_project" "docker" {
   }
   source {
     type      = "CODEPIPELINE"
-    buildspec = "terraform/buildspec/docker.yml"
+    buildspec = file("${path.module}/buildspec/docker.yml")
   }
   cache {
     type  = "LOCAL"
@@ -130,7 +130,7 @@ resource "aws_codebuild_project" "lint" {
   }
   source {
     type      = "CODEPIPELINE"
-    buildspec = "terraform/buildspec/lint.yml"
+    buildspec = file("${path.module}/buildspec/lint.yml")
   }
 }
 resource "aws_codebuild_project" "tf_plan" {
@@ -146,7 +146,7 @@ resource "aws_codebuild_project" "tf_plan" {
   }
   source {
     type      = "CODEPIPELINE"
-    buildspec = "terraform/buildspec/tf-plan.yml"
+    buildspec = file("${path.module}/buildspec/tf-plan.yml")
   }
 }
 
@@ -163,7 +163,7 @@ resource "aws_codebuild_project" "tf_apply" {
   }
   source {
     type      = "CODEPIPELINE"
-    buildspec = "terraform/buildspec/tf-apply.yml"
+    buildspec = file("${path.module}/buildspec/tf-apply.yml")
   }
 }
 
@@ -180,7 +180,13 @@ resource "aws_iam_role_policy" "codepipeline" {
     Version = "2012-10-17",
     Statement = [
       { Effect = "Allow", Action = ["s3:PutObject", "s3:GetObject", "s3:GetObjectVersion", "s3:GetBucketVersioning"], Resource = [aws_s3_bucket.ci_artifacts.arn, "${aws_s3_bucket.ci_artifacts.arn}/*"] },
-      { Effect = "Allow", Action = ["codebuild:BatchGetBuilds", "codebuild:StartBuild"], Resource = [aws_codebuild_project.lint.arn, aws_codebuild_project.docker.arn, aws_codebuild_project.tf_plan.arn, aws_codebuild_project.tf_apply.arn] }
+      { Effect = "Allow", Action = ["codebuild:BatchGetBuilds", "codebuild:StartBuild"], Resource = [
+        aws_codebuild_project.lint.arn,
+        aws_codebuild_project.docker.arn,
+        aws_codebuild_project.tf_plan.arn,
+        aws_codebuild_project.tf_apply.arn,
+        aws_codebuild_project.web_build_deploy.arn
+      ] }
     ]
   })
 }

@@ -23,6 +23,11 @@ def lambda_handler(event, context):
         claims = event.get("claims", [])
         counterclaims = event.get("counterclaims", [])
         case_facts = event.get("case_facts", "")
+        witnesses = event.get("witnesses", [])
+        config = event.get("config")
+        if not isinstance(config, dict):
+            logger.error("Missing or invalid 'config'")
+            raise ValueError("'config' is required and must be an object")
 
         if not case_facts:
             logger.warning("Case facts are missing. Instructions may be poor.")
@@ -39,7 +44,7 @@ def lambda_handler(event, context):
     # 2. Call the main generation pipeline
     try:
         instruction_list = instruction_processing.generate_instructions(
-            claims=claims, counterclaims=counterclaims, case_facts=case_facts
+            claims=claims, counterclaims=counterclaims, case_facts=case_facts, witnesses=witnesses, config=config
         )
 
         logger.info(f"Successfully generated {len(instruction_list)} instructions.")

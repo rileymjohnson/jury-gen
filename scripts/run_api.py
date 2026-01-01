@@ -39,18 +39,61 @@ def upload_file(put_url: str, path: Path, content_type: str = "application/pdf")
     r.raise_for_status()
 
 
-def call_api_start(
+def _build_default_config() -> dict[str, Any]:
+    # Provide sensible defaults for required config fields
+    return {
+        "incident_date": "2024-01-15",
+        "incident_location": "Miami, Florida",
+        "additional_voir_dire_info": "None.",
+        "include_so_help_you_god": True,
+        "oath_administered_by": "clerk",  # "judge" or "clerk"
+        "judge_name": "Judge Smith",
+        "plaintiff_name": "John Doe",
+        "defendant_name": "Rachel Rowe",
+        "plaintiff_attorney_name": "Alex Parker",
+        "plaintiff_attorney_gender": "male",
+        "defendant_attorney_name": "Morgan Lee",
+        "defendant_attorney_gender": "female",
+        "court_clerk_name": "Taylor Brooks",
+        "court_clerk_gender": "neutral",
+        "court_reporter_name": "Jordan Cruz",
+        "court_reporter_gender": "neutral",
+        "bailiff_name": "Casey Quinn",
+        "bailiff_gender": "neutral",
+        "electronic_device_policy": "A",
+        "permitted_ex_parte_communications": [
+            "juror parking",
+            "location of break areas",
+            "how and when to assemble for duty",
+            "dress",
+            "what personal items can be brought into the courthouse or jury room",
+        ],
+        "has_foreign_language_witnesses": False,
+        "has_expert_witnesses": False,
+        # Optional toggles for future use
+        "plaintiff_is_pro_se": False,
+        "defendant_is_pro_se": False,
+        "has_uim_carrier": False,
+        # When to give final instructions relative to final argument
+        # Allowed: "before_final_argument" | "after_final_argument"
+        "final_instructions_timing": "before_final_argument",
+    }
+
+
+def call_api_start(  # noqa: PLR0913
     base_url: str,
     api_key: str,
     complaint_key: str,
     answer_key: str,
-    witness_key: str
+    witness_key: str,
+    config: dict[str, Any],
 ) -> dict[str, Any]:
     url = f"{base_url}/jury/start"
     body = {
         "complaint_key": complaint_key,
         "answer_key": answer_key,
         "witness_key": witness_key,
+        "config": config,
     }
     r = requests.post(url, json=body, headers={"x-api-key": api_key, "Content-Type": "application/json"})
     r.raise_for_status()
@@ -158,6 +201,15 @@ def run(  # noqa: PLR0913, PLR0915
     out_dir = out_root / f"{env}-{example}-{run_id}"
     (out_dir / "input").mkdir(parents=True, exist_ok=True)
     (out_dir / "responses").mkdir(parents=True, exist_ok=True)
+    # Record which local input files were used
+    write_json(
+        out_dir / "input" / "files_used.json",
+        {
+            "complaint": str(complaint),
+            "answer": str(answer),
+            "witness_list": str(witness),
+        },
+    )
 
     # 1) Get presigned URLs
     signer_resp = call_api_sign(base_url, api_key)
@@ -170,13 +222,33 @@ def run(  # noqa: PLR0913, PLR0915
     if not (c_info and a_info and w_info):
         raise SystemExit("api_signer did not return expected upload slots")
 
-    # 2) Upload files
+    # 2) Copy inputs locally and upload files
+    #    Keep a local snapshot of the exact inputs used
+    try:
+        shutil.copy2(complaint, out_dir / "input" / complaint.name)
+        shutil.copy2(answer, out_dir / "input" / answer.name)
+        shutil.copy2(witness, out_dir / "input" / witness.name)
+    except Exception:
+        pass
+
+    # Upload to presigned URLs
     upload_file(c_info["presigned_url"], complaint, c_info.get("content_type", "application/pdf"))
     upload_file(a_info["presigned_url"], answer, a_info.get("content_type", "application/pdf"))
     upload_file(w_info["presigned_url"], witness, w_info.get("content_type", "application/pdf"))
 
     # 3) Start the workflow
-    start_resp = call_api_start(base_url, api_key, c_info["key"], a_info["key"], w_info["key"])
+    config = _build_default_config()
+    # Save request we send to /jury/start and persist config under input/
+    start_request = {
+        "complaint_key": c_info["key"],
+        "answer_key": a_info["key"],
+        "witness_key": w_info["key"],
+        "config": config,
+    }
+    write_json(out_dir / "responses" / "start_request.json", start_request)
+    write_json(out_dir / "input" / "config.json", config)
+
+    start_resp = call_api_start(base_url, api_key, c_info["key"], a_info["key"], w_info["key"], config)
     write_json(out_dir / "responses" / "start.json", start_resp)
 
     job_id = start_resp.get("jury_instruction_id")
@@ -221,6 +293,8 @@ def run(  # noqa: PLR0913, PLR0915
         "completedAt": last_status.get("completedAt"),
     }
     write_json(out_dir / "final.json", final)
+    # Also capture the raw final DynamoDB item for completeness
+    write_json(out_dir / "responses" / "final_status.json", last_status)
 
     # 6) Optionally capture Step Functions execution history
     if capture_history and execution_arn:

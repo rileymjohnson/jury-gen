@@ -16,6 +16,12 @@ variable "textract_get_results_tag" {
   default     = "latest"
 }
 
+variable "api_export_docx_tag" {
+  description = "ECR image tag for the api_export_docx Lambda image"
+  type        = string
+  default     = "latest"
+}
+
 variable "ci_branch" {
   description = "Branch to build from"
   type        = string
@@ -26,6 +32,18 @@ variable "ci_repository_id" {
   description = "Repository identifier for CodeStar Connections (e.g., 'owner/repo')"
   type        = string
   default     = "rileymjohnson/jury-gen"
+}
+
+variable "web_repository_id" {
+  description = "Frontend repository for CodePipeline (e.g., 'owner/repo')"
+  type        = string
+  default     = "rileymjohnson/jury-gen-web"
+}
+
+variable "web_branch" {
+  description = "Branch of the frontend repo to build/deploy"
+  type        = string
+  default     = "main"
 }
 
 variable "state_bucket_name" {

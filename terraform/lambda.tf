@@ -71,6 +71,8 @@ data "archive_file" "api_status" {
 }
 
 
+
+
 # --- Lambda Function Definitions ---
 
 resource "aws_lambda_function" "job_start" {
@@ -266,6 +268,21 @@ resource "aws_lambda_function" "api_status" {
   filename         = data.archive_file.api_status.output_path
   source_code_hash = data.archive_file.api_status.output_base64sha256
   timeout          = 10
+
+  environment {
+    variables = {
+      DYNAMODB_TABLE_NAME = aws_dynamodb_table.jury_instructions.name
+    }
+  }
+}
+
+resource "aws_lambda_function" "api_export_docx" {
+  function_name = "JuryApp-ApiExportDocx-${var.environment}"
+  role          = aws_iam_role.api_export_docx.arn
+  package_type  = "Image"
+  timeout       = 30
+
+  image_uri = "${data.aws_caller_identity.current.account_id}.dkr.ecr.${data.aws_region.current.name}.amazonaws.com/${aws_ecr_repository.api_export_docx.name}:${var.api_export_docx_tag}"
 
   environment {
     variables = {
