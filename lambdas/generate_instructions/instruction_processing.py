@@ -136,7 +136,7 @@ Consider:
     return "CUSTOM"
 
 
-def llm_select_instructions(claim_title, claim_elements, defenses, case_facts, available_instructions, damages=None):
+def llm_select_instructions(claim_title, claim_elements, defenses, case_facts, available_instructions, damages=None):  # noqa: PLR0913
     """
     LLM selects which instructions to include and returns customized versions
     """
@@ -259,7 +259,7 @@ Be thorough but conservative - only include instructions that are truly relevant
     return []
 
 
-def select_and_customize_instructions(category_number, claim, claim_elements, defenses, case_facts, damages=None):
+def select_and_customize_instructions(category_number, claim, claim_elements, defenses, case_facts, damages=None):  # noqa: PLR0913
     """
     Select which sub-instructions from a category apply and customize them
 
@@ -954,8 +954,8 @@ def generate_instructions(claims, counterclaims, case_facts, witnesses=None, con
             if "contract" in t or (category or "").startswith("416") or (category or "").startswith("504"):
                 cats.append("504")
             # Tort/personal injury or general tort categories
-            tort_prefixes = ("401", "402", "403", "404", "406", "407", "408", "409", "410", "411", "417", "418", "420", "451", "452")
-            if (category or "").startswith(tort_prefixes) or any(k in t for k in ["negligence", "injury", "tort", "premises", "products"]):
+            tort_prefixes = ("401", "402", "403", "404", "406", "407", "408", "409", "410", "411", "417", "418", "420", "451", "452")  # noqa: E501
+            if (category or "").startswith(tort_prefixes) or any(k in t for k in ["negligence", "injury", "tort", "premises", "products"]):  # noqa: E501
                 cats.append("501")
             # Punitive damages requested -> 503
             if damages and isinstance(damages.get("punitive"), list) and len(damages.get("punitive")) > 0:
