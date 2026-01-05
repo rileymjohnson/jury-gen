@@ -136,7 +136,7 @@ Consider:
     return "CUSTOM"
 
 
-def llm_select_instructions(claim_title, claim_elements, defenses, case_facts, available_instructions):
+def llm_select_instructions(claim_title, claim_elements, defenses, case_facts, available_instructions, damages=None):
     """
     LLM selects which instructions to include and returns customized versions
     """
@@ -144,6 +144,18 @@ def llm_select_instructions(claim_title, claim_elements, defenses, case_facts, a
     instructions_list = json.dumps(available_instructions, indent=2)
     defenses_list = "\n".join([f"- {d['name']}: {d['raw_text']}" for d in defenses])
     elements_list = "\n".join([f"- {elem}" for elem in claim_elements])
+    # Optional damages context to guide 5xx selection
+    damages = damages or {}
+    def _fmt(key):
+        vals = damages.get(key) or []
+        return "\n".join([f"- {v}" for v in vals]) if isinstance(vals, list) else ""
+    damages_text = (
+        "Compensatory:\n" + _fmt("compensatory") + "\n\n"
+        "Punitive:\n" + _fmt("punitive") + "\n\n"
+        "Statutory:\n" + _fmt("statutory") + "\n\n"
+        "Equitable:\n" + _fmt("equitable") + "\n\n"
+        "Other:\n" + _fmt("other")
+    )
 
     tools = [
         {
@@ -189,6 +201,9 @@ DEFENSES RAISED:
 
 CASE FACTS:
 {case_facts}
+
+DAMAGES REQUESTED (structured):
+{damages_text}
 
 AVAILABLE INSTRUCTIONS:
 {instructions_list}
@@ -244,7 +259,7 @@ Be thorough but conservative - only include instructions that are truly relevant
     return []
 
 
-def select_and_customize_instructions(category_number, claim, claim_elements, defenses, case_facts):
+def select_and_customize_instructions(category_number, claim, claim_elements, defenses, case_facts, damages=None):
     """
     Select which sub-instructions from a category apply and customize them
 
@@ -283,6 +298,7 @@ def select_and_customize_instructions(category_number, claim, claim_elements, de
         defenses=defenses,
         case_facts=case_facts,
         available_instructions=instructions_summary,
+        damages=damages,
     )
 
     return selected
@@ -841,6 +857,7 @@ def generate_instructions(claims, counterclaims, case_facts, witnesses=None, con
 
     custom_claims = []
     custom_counterclaims = []
+    processed_items: list[dict] = []  # track items for later 500-series selection
 
     # Load unique (category_number, category_title) pairs from DynamoDB
     _all_sji = _scan_all(_sji_table)
@@ -869,10 +886,20 @@ def generate_instructions(claims, counterclaims, case_facts, witnesses=None, con
                 claim_elements=claim.get("elements"),
                 defenses=claim_info.get("defenses", []),
                 case_facts=case_facts,
+                damages=claim_info.get("damages", {}),
             )
             all_instructions.extend(selected_instructions)
         else:
             custom_claims.append(claim_info)
+
+        processed_items.append(
+            {
+                "type": "claim",
+                "claim_info": claim_info,
+                "claim": claim,
+                "category": category,
+            }
+        )
 
     for counterclaim_info in counterclaims:
         claim = database_get_claim_by_id(counterclaim_info["claim_id"])
@@ -891,10 +918,20 @@ def generate_instructions(claims, counterclaims, case_facts, witnesses=None, con
                 claim_elements=claim.get("elements"),
                 defenses=[],  # Counterclaims don't have defenses from plaintiff
                 case_facts=case_facts,
+                damages=counterclaim_info.get("damages", {}),
             )
             all_instructions.extend(selected_instructions)
         else:
             custom_counterclaims.append(counterclaim_info)
+
+        processed_items.append(
+            {
+                "type": "counterclaim",
+                "claim_info": counterclaim_info,
+                "claim": claim,
+                "category": category,
+            }
+        )
 
     all_custom_claims = custom_claims + custom_counterclaims
 
@@ -903,6 +940,60 @@ def generate_instructions(claims, counterclaims, case_facts, witnesses=None, con
 
         custom_instructions = generate_custom_instructions(claim_info=claim_info, claim=claim, case_facts=case_facts)
         all_instructions.extend(custom_instructions)
+
+    # 500-series damages instructions (insert before 600-series)
+    try:
+        def _determine_damages_categories(title: str | None, category: str | None, damages: dict | None) -> list[str]:
+            t = (title or "").lower()
+            cats: list[str] = []
+            # Wrongful death takes precedence
+            if "wrongful death" in t or (category or "").startswith("502"):
+                cats.append("502")
+                return cats
+            # Contract claims
+            if "contract" in t or (category or "").startswith("416") or (category or "").startswith("504"):
+                cats.append("504")
+            # Tort/personal injury or general tort categories
+            tort_prefixes = ("401", "402", "403", "404", "406", "407", "408", "409", "410", "411", "417", "418", "420", "451", "452")
+            if (category or "").startswith(tort_prefixes) or any(k in t for k in ["negligence", "injury", "tort", "premises", "products"]):
+                cats.append("501")
+            # Punitive damages requested -> 503
+            if damages and isinstance(damages.get("punitive"), list) and len(damages.get("punitive")) > 0:
+                cats.append("503")
+            # Return unique in order
+            out: list[str] = []
+            for c in cats:
+                if c not in out:
+                    out.append(c)
+            return out
+
+        added_numbers: set[str] = set()
+        for item in processed_items:
+            claim = item.get("claim") or {}
+            claim_info = item.get("claim_info") or {}
+            category = item.get("category")
+
+            cat_list = _determine_damages_categories(
+                title=(claim or {}).get("title"), category=category, damages=claim_info.get("damages", {})
+            )
+            for cat in cat_list:
+                sel = select_and_customize_instructions(
+                    category_number=cat,
+                    claim=claim,
+                    claim_elements=claim.get("elements"),
+                    defenses=(claim_info.get("defenses", []) if item.get("type") == "claim" else []),
+                    case_facts=case_facts,
+                    damages=claim_info.get("damages", {}),
+                )
+                # Deduplicate by instruction number across all claims
+                for inst in sel:
+                    num = inst.get("number")
+                    if num and num not in added_numbers:
+                        added_numbers.add(num)
+                        all_instructions.append(inst)
+    except Exception:
+        # Do not fail the whole job if damages phase fails
+        pass
 
     # 600-series concluding instructions
     try:
