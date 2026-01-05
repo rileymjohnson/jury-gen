@@ -259,6 +259,107 @@ Be thorough but conservative - only include instructions that are truly relevant
     return []
 
 
+def llm_choose_damages_chapters(claim_title, claim_elements, defenses, case_facts, damages) -> list[str]:
+    """Use Bedrock to select which 5xx damages chapters apply (e.g., '501', '502', '503', '504').
+
+    No local heuristics. The model decides based on structured context.
+    """
+    defenses_list = "\n".join([f"- {d['name']}: {d['raw_text']}" for d in (defenses or [])])
+    elements_list = "\n".join([f"- {e}" for e in (claim_elements or [])])
+
+    damages = damages or {}
+    def _fmt(key):
+        vals = damages.get(key) or []
+        return "\n".join([f"- {v}" for v in vals]) if isinstance(vals, list) else ""
+    damages_text = (
+        "Compensatory:\n" + _fmt("compensatory") + "\n\n"
+        "Punitive:\n" + _fmt("punitive") + "\n\n"
+        "Statutory:\n" + _fmt("statutory") + "\n\n"
+        "Equitable:\n" + _fmt("equitable") + "\n\n"
+        "Other:\n" + _fmt("other")
+    )
+
+    tools = [
+        {
+            "name": "choose_damages_chapters",
+            "description": "Decide which 5xx damages chapters apply to this claim",
+            "input_schema": {
+                "type": "object",
+                "properties": {
+                    "chapters": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": "List of chapter numbers to apply (subset of ['501','502','503','504'])",
+                    },
+                    "reasoning": {"type": "string"},
+                },
+                "required": ["chapters", "reasoning"],
+            },
+        }
+    ]
+
+    prompt = f"""You are deciding which Florida 5xx damages instruction chapters apply.
+
+CLAIM TITLE:
+{claim_title}
+
+CLAIM ELEMENTS:
+{elements_list}
+
+DEFENSES RAISED:
+{defenses_list}
+
+CASE FACTS:
+{case_facts}
+
+DAMAGES REQUESTED (structured):
+{damages_text}
+
+Available chapters to choose from:
+- 501: Personal Injury and Property Damages
+- 502: Wrongful Death Damages
+- 503: Punitive Damages (bifurcated/non-bifurcated framework)
+- 504: Contract Damages
+
+Guidance:
+- Choose only those chapters that truly apply to this claim.
+- If punitive damages are actually sought, include 503; otherwise exclude 503.
+- For purely contract damages, choose 504 (even if economic losses are alleged).
+- For personal injury/property tort damages, choose 501.
+- For wrongful death claims, choose 502 (do not also include 501 unless both are independently necessary).
+- If none apply, return an empty list.
+"""
+
+    body = json.dumps(
+        {
+            "anthropic_version": "bedrock-2023-05-31",
+            "max_tokens": 500,
+            "tools": tools,
+            "tool_choice": {"type": "tool", "name": "choose_damages_chapters"},
+            "messages": [{"role": "user", "content": prompt}],
+        }
+    )
+
+    response = bedrock.invoke_model(
+        body=body,
+        modelId="us.anthropic.claude-3-5-sonnet-20241022-v2:0",
+        accept="application/json",
+        contentType="application/json",
+    )
+
+    response_body = json.loads(response.get("body").read())
+    for item in response_body.get("content", []):
+        if item.get("type") == "tool_use":
+            ch = item["input"].get("chapters") or []
+            out = []
+            for c in ch:
+                s = str(c).strip()
+                if s in {"501", "502", "503", "504"} and s not in out:
+                    out.append(s)
+            return out
+    return []
+
+
 def select_and_customize_instructions(category_number, claim, claim_elements, defenses, case_facts, damages=None):  # noqa: PLR0913
     """
     Select which sub-instructions from a category apply and customize them
@@ -557,12 +658,20 @@ def _generate_201_1(config: dict, case_facts: str, witnesses: list[dict]):
 
     results = []
     if include_oath:
-        pre_text = _llm_render_instruction(
-            template_text=inst.get("main_paragraph", ""), inputs=inputs, render_hint="pre-oath"
-        )
-        post_text = _llm_render_instruction(
-            template_text=inst.get("main_paragraph", ""), inputs=inputs, render_hint="post-oath"
-        )
+        template = inst.get("main_paragraph", "") or ""
+        # Deterministically split the template into pre-oath and post-oath segments
+        anchor = "will now administer your oath."
+        idx = template.find(anchor)
+        if idx != -1:
+            pre_tpl = template[: idx + len(anchor)]
+            post_tpl = template[idx + len(anchor) :].lstrip("\n")
+        else:
+            # Fallback: if anchor not found, let the model handle hints
+            pre_tpl = template
+            post_tpl = template
+
+        pre_text = _llm_render_instruction(template_text=pre_tpl, inputs=inputs)
+        post_text = _llm_render_instruction(template_text=post_tpl, inputs=inputs)
         if pre_text:
             results.append(
                 {
@@ -943,29 +1052,7 @@ def generate_instructions(claims, counterclaims, case_facts, witnesses=None, con
 
     # 500-series damages instructions (insert before 600-series)
     try:
-        def _determine_damages_categories(title: str | None, category: str | None, damages: dict | None) -> list[str]:
-            t = (title or "").lower()
-            cats: list[str] = []
-            # Wrongful death takes precedence
-            if "wrongful death" in t or (category or "").startswith("502"):
-                cats.append("502")
-                return cats
-            # Contract claims
-            if "contract" in t or (category or "").startswith("416") or (category or "").startswith("504"):
-                cats.append("504")
-            # Tort/personal injury or general tort categories
-            tort_prefixes = ("401", "402", "403", "404", "406", "407", "408", "409", "410", "411", "417", "418", "420", "451", "452")  # noqa: E501
-            if (category or "").startswith(tort_prefixes) or any(k in t for k in ["negligence", "injury", "tort", "premises", "products"]):  # noqa: E501
-                cats.append("501")
-            # Punitive damages requested -> 503
-            if damages and isinstance(damages.get("punitive"), list) and len(damages.get("punitive")) > 0:
-                cats.append("503")
-            # Return unique in order
-            out: list[str] = []
-            for c in cats:
-                if c not in out:
-                    out.append(c)
-            return out
+
 
         added_numbers: set[str] = set()
         for item in processed_items:
@@ -973,8 +1060,12 @@ def generate_instructions(claims, counterclaims, case_facts, witnesses=None, con
             claim_info = item.get("claim_info") or {}
             category = item.get("category")
 
-            cat_list = _determine_damages_categories(
-                title=(claim or {}).get("title"), category=category, damages=claim_info.get("damages", {})
+            cat_list = llm_choose_damages_chapters(
+                claim_title=(claim or {}).get("title"),
+                claim_elements=claim.get("elements"),
+                defenses=(claim_info.get("defenses", []) if item.get("type") == "claim" else []),
+                case_facts=case_facts,
+                damages=claim_info.get("damages", {}),
             )
             for cat in cat_list:
                 sel = select_and_customize_instructions(
@@ -1032,3 +1123,5 @@ def generate_instructions(claims, counterclaims, case_facts, witnesses=None, con
         pass
 
     return all_instructions
+
+
