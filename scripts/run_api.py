@@ -11,8 +11,8 @@ from typing import Any
 
 import requests
 
-DEFAULT_API_URL = "https://z8rj47cgo7.execute-api.us-east-1.amazonaws.com/dev"
-DEFAULT_API_KEY = "izVg8ltdAPfuvGVmnKZ5vLAswOAP4Nrz"
+DEFAULT_API_URL = "https://2c4krnu3gj.execute-api.us-east-1.amazonaws.com/dev"
+DEFAULT_API_KEY = "RbqaKXztZPYB1fl6gA1Im1zfUQnTPBTG"
 
 
 def read_json(p: Path) -> Any:
