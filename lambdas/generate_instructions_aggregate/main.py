@@ -1,15 +1,6 @@
 import logging
-import os
-import sys
 
-# Allow importing shared helpers from generate_instructions package folder
-CURRENT_DIR = os.path.dirname(__file__)
-PARENT_DIR = os.path.abspath(os.path.join(CURRENT_DIR, "..", "generate_instructions"))
-if PARENT_DIR not in sys.path:
-    sys.path.append(PARENT_DIR)
-
-import instruction_processing  # noqa: E402
-
+import instruction_processing
 
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
@@ -28,7 +19,7 @@ def _unique_by_number(instructions: list[dict]) -> list[dict]:
     return out
 
 
-def lambda_handler(event, _context):
+def lambda_handler(event, _context):  # noqa: PLR0912, PLR0915
     """
     Aggregate per-item instruction results and add 100s/200s and 600s series.
 

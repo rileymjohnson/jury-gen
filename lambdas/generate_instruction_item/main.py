@@ -1,16 +1,6 @@
-import json
 import logging
-import os
-import sys
 
-# Allow importing shared helpers from generate_instructions package folder
-CURRENT_DIR = os.path.dirname(__file__)
-PARENT_DIR = os.path.abspath(os.path.join(CURRENT_DIR, "..", "generate_instructions"))
-if PARENT_DIR not in sys.path:
-    sys.path.append(PARENT_DIR)
-
-import instruction_processing  # noqa: E402
-
+import instruction_processing
 
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
@@ -52,7 +42,6 @@ def lambda_handler(event, _context):
         item_type = event.get("type")
         item = event.get("item") or {}
         case_facts = event.get("case_facts") or ""
-        config = event.get("config") or {}
         claim_id = item.get("claim_id")
         if item_type not in ("claim", "counterclaim"):
             raise ValueError("'type' must be 'claim' or 'counterclaim'")
@@ -131,4 +120,3 @@ def lambda_handler(event, _context):
         "instructions": out_instructions,
         "processed_item": {"type": item_type, "claim_id": claim_id, "category": category},
     }
-

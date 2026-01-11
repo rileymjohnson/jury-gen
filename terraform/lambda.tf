@@ -53,6 +53,13 @@ data "archive_file" "generate_instructions" {
   output_path = abspath("${path.module}/.build/generate_instructions.zip")
 }
 
+# Shared instructions layer packaging
+data "archive_file" "instructions_layer" {
+  type        = "zip"
+  source_dir  = abspath("${path.module}/../layers/instructions/")
+  output_path = abspath("${path.module}/.build/instructions_layer.zip")
+}
+
 # New per-item generator Lambda
 data "archive_file" "generate_instruction_item" {
   type        = "zip"
@@ -198,6 +205,7 @@ resource "aws_lambda_function" "generate_instructions" {
   filename         = data.archive_file.generate_instructions.output_path
   source_code_hash = data.archive_file.generate_instructions.output_base64sha256
   timeout          = 900 # This is also very long
+  layers           = [aws_lambda_layer_version.instructions_shared.arn]
 
   environment {
     variables = {
@@ -217,6 +225,7 @@ resource "aws_lambda_function" "generate_instruction_item" {
   source_code_hash = data.archive_file.generate_instruction_item.output_base64sha256
   timeout          = 900
   memory_size      = 2048
+  layers           = [aws_lambda_layer_version.instructions_shared.arn]
 
   environment {
     variables = {
@@ -236,6 +245,7 @@ resource "aws_lambda_function" "generate_instructions_aggregate" {
   source_code_hash = data.archive_file.generate_instructions_aggregate.output_base64sha256
   timeout          = 600
   memory_size      = 1536
+  layers           = [aws_lambda_layer_version.instructions_shared.arn]
 
   environment {
     variables = {
@@ -243,6 +253,14 @@ resource "aws_lambda_function" "generate_instructions_aggregate" {
       DYNAMODB_STANDARD_JURY_INSTRUCTIONS_TABLE_NAME = aws_dynamodb_table.standard_jury_instructions.name
     }
   }
+}
+
+# Lambda Layer with shared instruction_processing module
+resource "aws_lambda_layer_version" "instructions_shared" {
+  layer_name          = "JuryApp-InstructionsShared-${var.environment}"
+  filename            = data.archive_file.instructions_layer.output_path
+  source_code_hash    = data.archive_file.instructions_layer.output_base64sha256
+  compatible_runtimes = ["python3.12"]
 }
 
 # --- Job Finish Lambdas ---

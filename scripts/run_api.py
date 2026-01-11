@@ -1,4 +1,5 @@
 import argparse
+import base64
 from datetime import datetime
 import json
 import os
@@ -10,10 +11,7 @@ import time
 from typing import Any
 
 import requests
-try:
-    from tqdm import tqdm
-except Exception:  # optional dependency
-    tqdm = None
+from tqdm import tqdm
 
 DEFAULT_API_URL = "https://2c4krnu3gj.execute-api.us-east-1.amazonaws.com/dev"
 DEFAULT_API_KEY = "RbqaKXztZPYB1fl6gA1Im1zfUQnTPBTG"
@@ -150,7 +148,7 @@ def call_api_status(base_url: str, api_key: str, job_id: str) -> dict[str, Any]:
     return r.json()
 
 
-def _poll_status_with_progress(
+def _poll_status_with_progress(  # noqa: PLR0913
     base_url: str,
     api_key: str,
     job_id: str,
@@ -210,7 +208,7 @@ def call_api_export_docx(base_url: str, api_key: str, job_id: str) -> bytes:
     url = f"{base_url}/jury/export/{job_id}"
     r = requests.get(url, headers={"x-api-key": api_key}, stream=True)
     # Allow 404/409 to raise with context
-    if r.status_code != 200:
+    if r.status_code != 200:  # noqa: PLR2004
         try:
             payload = r.json()
         except Exception:
@@ -222,8 +220,6 @@ def call_api_export_docx(base_url: str, api_key: str, job_id: str) -> bytes:
     # A valid .docx begins with bytes 'PK\x03\x04'. Base64-encoded DOCX often starts with 'UEsDB'.
     if not content.startswith(b"PK"):
         try:
-            import base64
-
             decoded = base64.b64decode(content, validate=True)
             if decoded.startswith(b"PK"):
                 return decoded
@@ -301,7 +297,7 @@ def _capture_sfn_history_cli(execution_arn: str, region: str, out_path: Path, aw
     print(f"Saved Step Functions history to {out_path}")
 
 
-def run(  # noqa: PLR0913, PLR0915
+def run(  # noqa: PLR0912, PLR0913, PLR0915
     example: str,
     env: str,
     out_root: Path,
@@ -416,7 +412,7 @@ def run(  # noqa: PLR0913, PLR0915
         # Stream download with progress when possible
         url = f"{base_url}/jury/export/{job_id}"
         r = requests.get(url, headers={"x-api-key": api_key}, stream=True)
-        if r.status_code != 200:
+        if r.status_code != 200:  # noqa: PLR2004
             try:
                 payload = r.json()
             except Exception:
@@ -433,16 +429,14 @@ def run(  # noqa: PLR0913, PLR0915
         first = next(r.iter_content(chunk_size=8192), b"")
         if first and not first.startswith(b"PK"):
             # Might be base64 body
-            rest = b"".join([first] + list(r.iter_content(chunk_size=262144)))
+            rest = b"".join([first, *list(r.iter_content(chunk_size=262144))])
             try:
-                import base64
-
                 data = base64.b64decode(rest, validate=True)
             except Exception:
                 data = rest
             docx_path.write_bytes(data)
         else:
-            bar = tqdm(total=total, unit="B", unit_scale=True, desc=f"Download {docx_path.name}") if tqdm and total else None
+            bar = tqdm(total=total, unit="B", unit_scale=True, desc=f"Download {docx_path.name}") if tqdm and total else None  # noqa: E501
             try:
                 with docx_path.open("wb") as f:
                     if first:
