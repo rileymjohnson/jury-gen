@@ -10,6 +10,10 @@ import time
 from typing import Any
 
 import requests
+try:
+    from tqdm import tqdm
+except Exception:  # optional dependency
+    tqdm = None
 
 DEFAULT_API_URL = "https://2c4krnu3gj.execute-api.us-east-1.amazonaws.com/dev"
 DEFAULT_API_KEY = "RbqaKXztZPYB1fl6gA1Im1zfUQnTPBTG"
@@ -33,10 +37,47 @@ def call_api_sign(base_url: str, api_key: str) -> dict[str, Any]:
     return r.json()
 
 
+class _ProgressFile:
+    def __init__(self, fp, progress=None):
+        self._fp = fp
+        self._progress = progress
+
+    def __getattr__(self, name):
+        # Delegate unknown attributes (e.g., 'mode', 'name', etc.) to the underlying file
+        return getattr(self._fp, name)
+
+    def read(self, n=-1):
+        data = self._fp.read(n)
+        if self._progress and data:
+            self._progress.update(len(data))
+        return data
+
+    def fileno(self):
+        return self._fp.fileno()
+
+    def seek(self, *args, **kwargs):
+        return self._fp.seek(*args, **kwargs)
+
+    def tell(self):
+        return self._fp.tell()
+
+    def close(self):
+        return self._fp.close()
+
+
 def upload_file(put_url: str, path: Path, content_type: str = "application/pdf") -> None:
-    with path.open("rb") as f:
-        r = requests.put(put_url, data=f, headers={"Content-Type": content_type})
-    r.raise_for_status()
+    total = path.stat().st_size if path.exists() else None
+    bar = None
+    if tqdm and total:
+        bar = tqdm(total=total, unit="B", unit_scale=True, desc=f"Upload {path.name}")
+    try:
+        with path.open("rb") as base:
+            fp = _ProgressFile(base, progress=bar)
+            r = requests.put(put_url, data=fp, headers={"Content-Type": content_type})
+        r.raise_for_status()
+    finally:
+        if bar:
+            bar.close()
 
 
 def _build_default_config() -> dict[str, Any]:
@@ -107,6 +148,88 @@ def call_api_status(base_url: str, api_key: str, job_id: str) -> dict[str, Any]:
         return {"_not_found": True}
     r.raise_for_status()
     return r.json()
+
+
+def _poll_status_with_progress(
+    base_url: str,
+    api_key: str,
+    job_id: str,
+    *,
+    out_path: Path,
+    max_wait_sec: int = 60 * 30,
+    interval_sec: int = 10,
+) -> dict[str, Any]:
+    """Poll the job status with a progress bar until COMPLETE or timeout.
+
+    Writes a JSONL of status snapshots to out_path. Returns the final status dict.
+    """
+    deadline = time.time() + max_wait_sec
+    last_status: dict[str, Any] | None = None
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    total = max_wait_sec
+    bar = tqdm(total=total, unit="s", desc="Polling status", leave=True) if tqdm else None
+    try:
+        with out_path.open("w", encoding="utf-8") as f:
+            while time.time() < deadline:
+                status = call_api_status(base_url, api_key, job_id)
+                f.write(json.dumps(status) + "\n")
+                f.flush()
+
+                if status.get("_not_found"):
+                    time.sleep(3)
+                else:
+                    last_status = status
+                    s = str(status.get("status") or "").upper()
+                    # Try to show instruction count if available
+                    count = 0
+                    try:
+                        ji = status.get("jury_instructions_text") or []
+                        if isinstance(ji, list):
+                            count = len(ji)
+                    except Exception:
+                        count = 0
+                    if bar:
+                        elapsed = int(total - max(0, int(deadline - time.time())))
+                        bar.n = min(elapsed, total)
+                        bar.set_description(f"Status: {s or 'PENDING'} | Instructions: {count}")
+                        bar.refresh()
+                    if s == "COMPLETE":
+                        break
+                    time.sleep(interval_sec)
+            return last_status or {}
+    finally:
+        if bar:
+            bar.close()
+
+
+def call_api_export_docx(base_url: str, api_key: str, job_id: str) -> bytes:
+    """Download the generated DOCX for a completed job.
+
+    Returns raw bytes of the .docx file. Raises for non-200 status codes.
+    """
+    url = f"{base_url}/jury/export/{job_id}"
+    r = requests.get(url, headers={"x-api-key": api_key}, stream=True)
+    # Allow 404/409 to raise with context
+    if r.status_code != 200:
+        try:
+            payload = r.json()
+        except Exception:
+            payload = {"error": f"HTTP {r.status_code}", "body": r.text[:500]}
+        raise RuntimeError(f"Export failed: {payload}")
+
+    content = r.content
+    # If API Gateway didn't apply binary decoding, we may receive base64 text.
+    # A valid .docx begins with bytes 'PK\x03\x04'. Base64-encoded DOCX often starts with 'UEsDB'.
+    if not content.startswith(b"PK"):
+        try:
+            import base64
+
+            decoded = base64.b64decode(content, validate=True)
+            if decoded.startswith(b"PK"):
+                return decoded
+        except Exception:
+            pass
+    return content
 
 
 def _infer_region_from_url(api_url: str) -> str:
@@ -258,23 +381,14 @@ def run(  # noqa: PLR0913, PLR0915
 
     # 4) Poll status
     poll_path = out_dir / "responses" / "status_progress.jsonl"
-    deadline = time.time() + 60 * 30  # 30 minutes
-    last_status = None
-    with poll_path.open("w", encoding="utf-8") as f:
-        while time.time() < deadline:
-            status = call_api_status(base_url, api_key, job_id)
-            f.write(json.dumps(status) + "\n")
-            f.flush()
-
-            if status.get("_not_found"):
-                time.sleep(3)
-                continue
-
-            last_status = status
-            s = str(status.get("status") or "").upper()
-            if s == "COMPLETE":
-                break
-            time.sleep(10)
+    last_status = _poll_status_with_progress(
+        base_url,
+        api_key,
+        job_id,
+        out_path=poll_path,
+        max_wait_sec=60 * 30,
+        interval_sec=10,
+    )
 
     if not last_status or str(last_status.get("status", "")).upper() != "COMPLETE":
         raise SystemExit("Timed out waiting for job completion. See status_progress.jsonl for details.")
@@ -296,7 +410,60 @@ def run(  # noqa: PLR0913, PLR0915
     # Also capture the raw final DynamoDB item for completeness
     write_json(out_dir / "responses" / "final_status.json", last_status)
 
-    # 6) Optionally capture Step Functions execution history
+    # 6) Export DOCX and save alongside outputs
+    try:
+        docx_path = out_dir / f"JuryInstructions-{job_id}.docx"
+        # Stream download with progress when possible
+        url = f"{base_url}/jury/export/{job_id}"
+        r = requests.get(url, headers={"x-api-key": api_key}, stream=True)
+        if r.status_code != 200:
+            try:
+                payload = r.json()
+            except Exception:
+                payload = {"error": f"HTTP {r.status_code}", "body": r.text[:500]}
+            raise RuntimeError(f"Export failed: {payload}")
+
+        total = None
+        try:
+            total = int(r.headers.get("Content-Length")) if r.headers.get("Content-Length") else None
+        except Exception:
+            total = None
+
+        # Peek first chunk
+        first = next(r.iter_content(chunk_size=8192), b"")
+        if first and not first.startswith(b"PK"):
+            # Might be base64 body
+            rest = b"".join([first] + list(r.iter_content(chunk_size=262144)))
+            try:
+                import base64
+
+                data = base64.b64decode(rest, validate=True)
+            except Exception:
+                data = rest
+            docx_path.write_bytes(data)
+        else:
+            bar = tqdm(total=total, unit="B", unit_scale=True, desc=f"Download {docx_path.name}") if tqdm and total else None
+            try:
+                with docx_path.open("wb") as f:
+                    if first:
+                        f.write(first)
+                        if bar:
+                            bar.update(len(first))
+                    for chunk in r.iter_content(chunk_size=262144):
+                        if not chunk:
+                            continue
+                        f.write(chunk)
+                        if bar:
+                            bar.update(len(chunk))
+            finally:
+                if bar:
+                    bar.close()
+        print(f"Saved DOCX to {docx_path}")
+    except Exception as e:
+        # Non-fatal: keep other outputs even if export fails
+        print(f"Warning: failed to export DOCX: {e}")
+
+    # 7) Optionally capture Step Functions execution history
     if capture_history and execution_arn:
         effective_region = region or _infer_region_from_url(base_url)
         _capture_sfn_history_cli(

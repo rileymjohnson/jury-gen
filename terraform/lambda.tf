@@ -53,6 +53,20 @@ data "archive_file" "generate_instructions" {
   output_path = abspath("${path.module}/.build/generate_instructions.zip")
 }
 
+# New per-item generator Lambda
+data "archive_file" "generate_instruction_item" {
+  type        = "zip"
+  source_dir  = abspath("${path.module}/../lambdas/generate_instruction_item/")
+  output_path = abspath("${path.module}/.build/generate_instruction_item.zip")
+}
+
+# New aggregator Lambda
+data "archive_file" "generate_instructions_aggregate" {
+  type        = "zip"
+  source_dir  = abspath("${path.module}/../lambdas/generate_instructions_aggregate/")
+  output_path = abspath("${path.module}/.build/generate_instructions_aggregate.zip")
+}
+
 # --- API Lambdas (zip)
 data "archive_file" "api_signer" {
   type        = "zip"
@@ -184,6 +198,44 @@ resource "aws_lambda_function" "generate_instructions" {
   filename         = data.archive_file.generate_instructions.output_path
   source_code_hash = data.archive_file.generate_instructions.output_base64sha256
   timeout          = 900 # This is also very long
+
+  environment {
+    variables = {
+      DYNAMODB_CLAIMS_TABLE_NAME = aws_dynamodb_table.claims.name
+      DYNAMODB_STANDARD_JURY_INSTRUCTIONS_TABLE_NAME = aws_dynamodb_table.standard_jury_instructions.name
+    }
+  }
+}
+
+# Per-item generator Lambda (used by Map state)
+resource "aws_lambda_function" "generate_instruction_item" {
+  function_name    = "JuryApp-GenerateInstructionItem-${var.environment}"
+  handler          = "main.lambda_handler"
+  runtime          = "python3.12"
+  role             = aws_iam_role.generate_instruction_item.arn
+  filename         = data.archive_file.generate_instruction_item.output_path
+  source_code_hash = data.archive_file.generate_instruction_item.output_base64sha256
+  timeout          = 900
+  memory_size      = 2048
+
+  environment {
+    variables = {
+      DYNAMODB_CLAIMS_TABLE_NAME = aws_dynamodb_table.claims.name
+      DYNAMODB_STANDARD_JURY_INSTRUCTIONS_TABLE_NAME = aws_dynamodb_table.standard_jury_instructions.name
+    }
+  }
+}
+
+# Aggregator Lambda
+resource "aws_lambda_function" "generate_instructions_aggregate" {
+  function_name    = "JuryApp-GenerateInstructionsAggregate-${var.environment}"
+  handler          = "main.lambda_handler"
+  runtime          = "python3.12"
+  role             = aws_iam_role.generate_instructions_aggregate.arn
+  filename         = data.archive_file.generate_instructions_aggregate.output_path
+  source_code_hash = data.archive_file.generate_instructions_aggregate.output_base64sha256
+  timeout          = 600
+  memory_size      = 1536
 
   environment {
     variables = {

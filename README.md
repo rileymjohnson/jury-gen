@@ -53,7 +53,9 @@ Local Runner
     - EnrichClaims: map over claims via `enrich_legal_item` (adds damages/defenses).
     - EnrichCounterclaims: map over counterclaims via `enrich_legal_item` (adds damages only).
   - AssembleEnrichedResults (Pass): merges enriched outputs + chunks.
-  - GenerateInstructions: `generate_instructions` produces final instructions list.
+  - GenerateClaimInstructions (Map): runs per claim via `generate_instruction_item`.
+  - GenerateCounterclaimInstructions (Map): runs per counterclaim via `generate_instruction_item`.
+  - AggregateInstructions: `generate_instructions_aggregate` merges results, adds 100/200/600 series, and outputs final list.
   - SaveResults: `job_save_results` persists outputs.
   - JobFailed: `job_handle_error` persists failure context.
 
@@ -87,14 +89,18 @@ Local Runner
     - For counterclaims: adds damages (from answer).
 
 - Synthesis
-  - `lambdas/generate_instructions/main.py`:
-    - Input: `{ claims: [...], counterclaims: [...], case_facts: "..." }`.
-    - Joins with `StandardJuryInstructions-*` to emit tailored instruction objects.
-    - Includes 100s/200s scaffolding and 600s concluding instructions. 600s behavior:
+  - `lambdas/generate_instruction_item/main.py`:
+    - Input: `{ type: "claim"|"counterclaim", item: {...}, case_facts: "...", config: {...} }`.
+    - For the item: category match → select/customize 4xx or custom → choose 5xx damages → select/customize 5xx.
+    - Output: `{ instructions: [...], processed_item: { type, claim_id, category } }`.
+  - `lambdas/generate_instructions_aggregate/main.py`:
+    - Input: per-item results + core context (claims, counterclaims, case_facts, witnesses, config).
+    - Produces 201.x scaffolding, merges/dedupes 4xx/5xx, and adds 600-series concluding instructions.
+    - 600s behavior:
       - 601.1 always included.
-      - 601.2 combines general witness evaluation and expert guidance; include the expert subsection only when `config.has_expert_witnesses` is true.
+      - 601.2 includes expert subsection only when `config.has_expert_witnesses` is true.
       - 601.3 included when `config.has_foreign_language_witnesses` is true.
-      - 601.4 included when there is more than one claim overall; Bedrock adapts wording based on provided context.
+      - 601.4 included when there is more than one claim overall; Bedrock adapts wording.
       - 601.5 included when `config.final_instructions_timing == "before_final_argument"`.
 
 - API (HTTP)
