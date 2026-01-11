@@ -404,6 +404,33 @@ resource "aws_iam_role_policy_attachment" "generate_instructions_bedrock" {
   policy_arn = aws_iam_policy.bedrock_analyzer_policy.arn
 }
 
+# Role for generate_instruction_item
+resource "aws_iam_role" "generate_instruction_item" {
+  name               = "GenerateInstructionItemLambdaRole${local.env_suffix}"
+  assume_role_policy = data.aws_iam_policy_document.lambda_assume_role.json
+}
+resource "aws_iam_role_policy_attachment" "generate_instruction_item_logging" {
+  role       = aws_iam_role.generate_instruction_item.name
+  policy_arn = aws_iam_policy.lambda_basic_logging.arn
+}
+resource "aws_iam_role_policy_attachment" "generate_instruction_item_bedrock" {
+  role       = aws_iam_role.generate_instruction_item.name
+  policy_arn = aws_iam_policy.bedrock_analyzer_policy.arn
+}
+
+# Role for generate_instructions_aggregate
+resource "aws_iam_role" "generate_instructions_aggregate" {
+  name               = "GenerateInstructionsAggregateLambdaRole${local.env_suffix}"
+  assume_role_policy = data.aws_iam_policy_document.lambda_assume_role.json
+}
+resource "aws_iam_role_policy_attachment" "generate_instructions_aggregate_logging" {
+  role       = aws_iam_role.generate_instructions_aggregate.name
+  policy_arn = aws_iam_policy.lambda_basic_logging.arn
+}
+resource "aws_iam_role_policy_attachment" "generate_instructions_aggregate_bedrock" {
+  role       = aws_iam_role.generate_instructions_aggregate.name
+  policy_arn = aws_iam_policy.bedrock_analyzer_policy.arn
+}
 
 # --- Roles for Job Finish ---
 resource "aws_iam_role" "job_save_results" {
@@ -496,7 +523,8 @@ resource "aws_iam_role_policy" "sfn_execution_role_inline" {
           aws_lambda_function.extract_witnesses.arn,
           aws_lambda_function.extract_case_facts.arn,
           aws_lambda_function.enrich_legal_item.arn,
-          aws_lambda_function.generate_instructions.arn,
+          aws_lambda_function.generate_instruction_item.arn,
+          aws_lambda_function.generate_instructions_aggregate.arn,
           aws_lambda_function.job_save_results.arn,
           aws_lambda_function.job_handle_error.arn,
         ]

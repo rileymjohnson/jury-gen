@@ -387,19 +387,117 @@ resource "aws_sfn_state_machine" "jury_app_workflow" {
           "claims.$": "$.enriched[0].claims",
           "counterclaims.$": "$.enriched[1].counterclaims"
         },
-        "Next": "GenerateInstructions"
+        "Next": "GenerateClaimInstructions"
       },
 
-      "GenerateInstructions": {
-        "Type": "Task",
-        "Resource": "${aws_lambda_function.generate_instructions.arn}",
+      "GenerateClaimInstructions": {
+        "Type": "Map",
+        "ItemsPath": "$.claims",
+        "MaxConcurrency": 4,
         "Parameters": {
-          "claims.$": "$.claims",
-          "counterclaims.$": "$.counterclaims",
+          "type": "claim",
+          "item.$": "$$.Map.Item.Value",
           "case_facts.$": "$.case_facts",
-          "witnesses.$": "$.witnesses",
           "config.$": "$.job_data.config"
         },
+        "Iterator": {
+          "StartAt": "GenerateClaimInstructionItem",
+          "States": {
+            "GenerateClaimInstructionItem": {
+              "Type": "Task",
+              "Resource": "${aws_lambda_function.generate_instruction_item.arn}",
+              "Retry": [
+                {
+                  "ErrorEquals": ["ThrottlingException", "BedrockInvocationException", "States.TaskFailed"],
+                  "IntervalSeconds": 2,
+                  "BackoffRate": 2.0,
+                  "MaxAttempts": 3
+                }
+              ],
+              "Catch": [
+                {
+                  "ErrorEquals": ["States.ALL"],
+                  "ResultPath": "$.error",
+                  "Next": "ClaimItemFallback"
+                }
+              ],
+              "End": true
+            },
+            "ClaimItemFallback": {
+              "Type": "Pass",
+              "Parameters": {"instructions": [], "processed_item": null},
+              "End": true
+            }
+          }
+        },
+        "ResultPath": "$.claim_results",
+        "Next": "GenerateCounterclaimInstructions"
+      },
+
+      "GenerateCounterclaimInstructions": {
+        "Type": "Map",
+        "ItemsPath": "$.counterclaims",
+        "MaxConcurrency": 4,
+        "Parameters": {
+          "type": "counterclaim",
+          "item.$": "$$.Map.Item.Value",
+          "case_facts.$": "$.case_facts",
+          "config.$": "$.job_data.config"
+        },
+        "Iterator": {
+          "StartAt": "GenerateCounterclaimInstructionItem",
+          "States": {
+            "GenerateCounterclaimInstructionItem": {
+              "Type": "Task",
+              "Resource": "${aws_lambda_function.generate_instruction_item.arn}",
+              "Retry": [
+                {
+                  "ErrorEquals": ["ThrottlingException", "BedrockInvocationException", "States.TaskFailed"],
+                  "IntervalSeconds": 2,
+                  "BackoffRate": 2.0,
+                  "MaxAttempts": 3
+                }
+              ],
+              "Catch": [
+                {
+                  "ErrorEquals": ["States.ALL"],
+                  "ResultPath": "$.error",
+                  "Next": "CounterclaimItemFallback"
+                }
+              ],
+              "End": true
+            },
+            "CounterclaimItemFallback": {
+              "Type": "Pass",
+              "Parameters": {"instructions": [], "processed_item": null},
+              "End": true
+            }
+          }
+        },
+        "ResultPath": "$.counterclaim_results",
+        "Next": "AggregateInstructions"
+      },
+
+      "AggregateInstructions": {
+        "Type": "Task",
+        "Resource": "${aws_lambda_function.generate_instructions_aggregate.arn}",
+        "Parameters": {
+          "claim_results.$": "$.claim_results",
+          "counterclaim_results.$": "$.counterclaim_results",
+          "case_facts.$": "$.case_facts",
+          "witnesses.$": "$.witnesses",
+          "config.$": "$.job_data.config",
+          "claims.$": "$.claims",
+          "counterclaims.$": "$.counterclaims"
+        },
+        "Retry": [
+          {
+            "ErrorEquals": ["ThrottlingException", "BedrockInvocationException", "States.TaskFailed"],
+            "IntervalSeconds": 2,
+            "BackoffRate": 2.0,
+            "MaxAttempts": 3
+          }
+        ],
         "Catch": [
           {
             "ErrorEquals": ["States.ALL"],
@@ -444,7 +542,8 @@ resource "aws_sfn_state_machine" "jury_app_workflow" {
     aws_lambda_function.extract_witnesses,
     aws_lambda_function.extract_case_facts,
     aws_lambda_function.enrich_legal_item,
-    aws_lambda_function.generate_instructions,
+    aws_lambda_function.generate_instruction_item,
+    aws_lambda_function.generate_instructions_aggregate,
     aws_lambda_function.job_save_results,
     aws_lambda_function.job_handle_error
   ]
