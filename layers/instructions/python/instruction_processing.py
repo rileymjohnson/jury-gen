@@ -401,8 +401,21 @@ def select_and_customize_instructions(category_number, claim, claim_elements, de
         available_instructions=instructions_summary,
         damages=damages,
     )
+    # Ensure each selected instruction carries a title.
+    number_to_title = {str(i.get("number")): (i.get("title") or "") for i in instructions_summary}
+    out: list[dict] = []
+    for inst in selected or []:
+        num = str((inst or {}).get("number") or "")
+        title = (inst or {}).get("title")
+        if not title:
+            title = number_to_title.get(num)
+        if not title:
+            base = (claim or {}).get("title") or "Instruction"
+            title = f"{base} ({num})" if num else base
+        inst["title"] = title
+        out.append(inst)
 
-    return selected
+    return out
 
 
 def generate_custom_instructions(claim_info, claim, case_facts):
@@ -517,6 +530,10 @@ Each instruction should be a separate item in the array."""  # noqa: E501
             for i, inst in enumerate(instructions, 1):
                 title = (claim.get("title") or "").upper().replace(" ", "-")
                 inst["number"] = f"CUSTOM-{title}-{i}"
+                # Ensure a readable title for the user
+                if not inst.get("title"):
+                    human_title = (claim.get("title") or "Custom Instruction").strip()
+                    inst["title"] = f"Custom – {human_title} #{i}"
                 inst["claim_description"] = claim.get("description")
                 inst["claim_elements"] = claim.get("elements")
             return instructions
@@ -678,6 +695,7 @@ def _generate_201_1(config: dict, case_facts: str, witnesses: list[dict]):
                     "number": inst.get("number"),
                     "title": inst.get("title"),
                     "customized_text": pre_text,
+                    "reasoning": "Standard preliminary instruction 201.1 (pre‑oath) tailored to this case; included before the oath is administered.",
                     "meta": {"is_continuation_part": False},
                 }
             )
@@ -687,6 +705,7 @@ def _generate_201_1(config: dict, case_facts: str, witnesses: list[dict]):
                     "number": inst.get("number"),
                     "title": inst.get("title"),
                     "customized_text": post_text,
+                    "reasoning": "Standard preliminary instruction 201.1 (post‑oath) continuation following the oath, customized for this case.",
                     "meta": {"is_continuation_part": True},
                 }
             )
@@ -698,6 +717,7 @@ def _generate_201_1(config: dict, case_facts: str, witnesses: list[dict]):
                     "number": inst.get("number"),
                     "title": inst.get("title"),
                     "customized_text": combined,
+                    "reasoning": "Standard preliminary instruction 201.1 customized for this case; the oath segment is omitted per court practice.",
                     "meta": {"is_continuation_part": False},
                 }
             )
@@ -756,10 +776,28 @@ def _generate_201_2(config: dict):
     )
     if not text:
         return None
+    # Build concise reasoning from toggles
+    reasons: list[str] = [
+        "Standard instruction 201.2 introducing participants and procedure; customized to this courtroom and case."
+    ]
+    if inputs.get("plaintiff_is_pro_se"):
+        reasons.append("includes pro se plaintiff guidance")
+    if inputs.get("defendant_is_pro_se"):
+        reasons.append("includes pro se defendant guidance")
+    if inputs.get("has_uim_carrier") and (inputs.get("uim_carrier_name") or ""):
+        reasons.append(f"notes {inputs.get('uim_carrier_name')} as the uninsured/underinsured motorist carrier")
+    policy = (inputs.get("electronic_device_policy") or "").strip()
+    if policy:
+        reasons.append(f"applies electronic device policy {policy}")
+    comms = inputs.get("permitted_ex_parte_communications") or []
+    if isinstance(comms, list) and comms:
+        reasons.append("reflects permitted ex parte communication topics")
+    reasoning = "; ".join(reasons)
     return {
         "number": inst.get("number"),
         "title": inst.get("title"),
         "customized_text": text,
+        "reasoning": reasoning,
     }
 
 
@@ -776,6 +814,7 @@ def _generate_201_3():
         "number": inst.get("number"),
         "title": inst.get("title"),
         "customized_text": text,
+        "reasoning": "Included as part of the standard preliminary instructions (201.3).",
     }
 
 
@@ -795,6 +834,7 @@ def _generate_101_1(config: dict):
         "number": inst.get("number"),
         "title": inst.get("title"),
         "customized_text": text,
+        "reasoning": "Juror oath (101.1) included per court practice.",
     }
 
 
@@ -810,6 +850,7 @@ def _generate_601_1():
         "number": inst.get("number"),
         "title": inst.get("title"),
         "customized_text": text,
+        "reasoning": "Standard instruction 601.1 included as general concluding guidance for jurors.",
     }
 
 
@@ -833,10 +874,15 @@ def _generate_601_2(config: dict | None = None):
     )
     if not text:
         return None
+    reasoning = (
+        "Standard instruction 601.2 on evaluating witness credibility; "
+        + ("includes expert‑witness guidance" if inputs.get("has_expert_witnesses") else "omits expert‑witness guidance")
+    )
     return {
         "number": inst.get("number"),
         "title": inst.get("title"),
         "customized_text": text,
+        "reasoning": reasoning,
     }
 
 
@@ -856,6 +902,7 @@ def _generate_601_3(config: dict):
         "number": inst.get("number"),
         "title": inst.get("title"),
         "customized_text": text,
+        "reasoning": "Included because foreign‑language testimony will be presented (601.3).",
     }
 
 
@@ -893,6 +940,7 @@ def _generate_601_4(claims: list[dict], counterclaims: list[dict]):
         "number": inst.get("number"),
         "title": inst.get("title"),
         "customized_text": text,
+        "reasoning": f"Included because there are multiple claims/counterclaims (601.4; total={total}).",
     }
 
 
@@ -915,6 +963,7 @@ def _generate_601_5(config: dict):
         "number": inst.get("number"),
         "title": inst.get("title"),
         "customized_text": text,
+        "reasoning": "Included because this court gives final instructions before closing arguments (601.5).",
     }
 
 
@@ -1123,5 +1172,3 @@ def generate_instructions(claims, counterclaims, case_facts, witnesses=None, con
         pass
 
     return all_instructions
-
-
