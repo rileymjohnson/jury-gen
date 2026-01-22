@@ -533,7 +533,7 @@ Each instruction should be a separate item in the array."""  # noqa: E501
                 # Ensure a readable title for the user
                 if not inst.get("title"):
                     human_title = (claim.get("title") or "Custom Instruction").strip()
-                    inst["title"] = f"Custom – {human_title} #{i}"
+                    inst["title"] = f"Custom – {human_title} #{i}"  # noqa: RUF001
                 inst["claim_description"] = claim.get("description")
                 inst["claim_elements"] = claim.get("elements")
             return instructions
@@ -695,7 +695,7 @@ def _generate_201_1(config: dict, case_facts: str, witnesses: list[dict]):
                     "number": inst.get("number"),
                     "title": inst.get("title"),
                     "customized_text": pre_text,
-                    "reasoning": "Standard preliminary instruction 201.1 (pre‑oath) tailored to this case; included before the oath is administered.",
+                    "reasoning": "Standard preliminary instruction 201.1 (pre‑oath) tailored to this case; included before the oath is administered.",  # noqa: E501, RUF001
                     "meta": {"is_continuation_part": False},
                 }
             )
@@ -705,7 +705,7 @@ def _generate_201_1(config: dict, case_facts: str, witnesses: list[dict]):
                     "number": inst.get("number"),
                     "title": inst.get("title"),
                     "customized_text": post_text,
-                    "reasoning": "Standard preliminary instruction 201.1 (post‑oath) continuation following the oath, customized for this case.",
+                    "reasoning": "Standard preliminary instruction 201.1 (post‑oath) continuation following the oath, customized for this case.",  # noqa: E501, RUF001
                     "meta": {"is_continuation_part": True},
                 }
             )
@@ -717,7 +717,7 @@ def _generate_201_1(config: dict, case_facts: str, witnesses: list[dict]):
                     "number": inst.get("number"),
                     "title": inst.get("title"),
                     "customized_text": combined,
-                    "reasoning": "Standard preliminary instruction 201.1 customized for this case; the oath segment is omitted per court practice.",
+                    "reasoning": "Standard preliminary instruction 201.1 customized for this case; the oath segment is omitted per court practice.",  # noqa: E501
                     "meta": {"is_continuation_part": False},
                 }
             )
@@ -876,7 +876,7 @@ def _generate_601_2(config: dict | None = None):
         return None
     reasoning = (
         "Standard instruction 601.2 on evaluating witness credibility; "
-        + ("includes expert‑witness guidance" if inputs.get("has_expert_witnesses") else "omits expert‑witness guidance")
+        + ("includes expert‑witness guidance" if inputs.get("has_expert_witnesses") else "omits expert‑witness guidance")  # noqa: E501, RUF001
     )
     return {
         "number": inst.get("number"),
@@ -902,7 +902,7 @@ def _generate_601_3(config: dict):
         "number": inst.get("number"),
         "title": inst.get("title"),
         "customized_text": text,
-        "reasoning": "Included because foreign‑language testimony will be presented (601.3).",
+        "reasoning": "Included because foreign‑language testimony will be presented (601.3).",  # noqa: RUF001
     }
 
 
