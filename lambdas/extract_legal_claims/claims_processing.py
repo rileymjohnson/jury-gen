@@ -397,7 +397,7 @@ Also update the context paragraph to summarize what you've seen so far.""",
     return {"updated_context": previous_context, "claims": []}
 
 
-def extract_raw_claims(chunks: list[str], window_size: int = 3, claim_type: str = "claims") -> list[dict]:
+def extract_raw_claims(chunks: list[str], window_size: int = 15, claim_type: str = "claims") -> list[dict]:
     """Extract claims or counterclaims from a complaint using sliding window approach.
 
     Args:
@@ -448,13 +448,20 @@ def extract_raw_claims(chunks: list[str], window_size: int = 3, claim_type: str 
     return all_claims
 
 
-def extract_claims(chunks: list[str], window_size: int = 3) -> list[dict]:
+def extract_claims(chunks: list[str], window_size: int = 15) -> list[dict]:
     """Full pipeline: extract plaintiff's claims, deduplicate, and match to database.
 
     Returns:
         List of {'claim_id': int|None, 'raw_texts': list[str]} dicts
     """
-    # Extract plaintiff's claims with sliding window
+    # Allow override via env var for rapid tuning
+    import os
+    try:
+        env_ws = int(os.environ.get("EXTRACT_WINDOW_SIZE", str(window_size)))
+        window_size = env_ws if env_ws > 0 else window_size
+    except Exception:
+        pass
+    # Extract plaintiff's claims with sliding window (larger default window)
     raw_claims = extract_raw_claims(chunks, window_size, claim_type="claims")
 
     # Deduplicate
@@ -466,13 +473,20 @@ def extract_claims(chunks: list[str], window_size: int = 3) -> list[dict]:
     return matched
 
 
-def extract_counterclaims(chunks: list[str], window_size: int = 3) -> list[dict]:
+def extract_counterclaims(chunks: list[str], window_size: int = 15) -> list[dict]:
     """Full pipeline: extract defendant's counterclaims, deduplicate, and match to database.
 
     Returns:
         List of {'claim_id': int|None, 'raw_texts': list[str]} dicts
     """
-    # Extract defendant's counterclaims with sliding window
+    # Allow override via env var for rapid tuning
+    import os
+    try:
+        env_ws = int(os.environ.get("EXTRACT_WINDOW_SIZE", str(window_size)))
+        window_size = env_ws if env_ws > 0 else window_size
+    except Exception:
+        pass
+    # Extract defendant's counterclaims with sliding window (larger default window)
     raw_counterclaims = extract_raw_claims(chunks, window_size, claim_type="counterclaims")
 
     # Deduplicate
