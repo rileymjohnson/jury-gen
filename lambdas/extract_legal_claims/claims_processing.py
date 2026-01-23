@@ -455,7 +455,6 @@ def extract_claims(chunks: list[str], window_size: int = 15) -> list[dict]:
         List of {'claim_id': int|None, 'raw_texts': list[str]} dicts
     """
     # Allow override via env var for rapid tuning
-    import os
     try:
         env_ws = int(os.environ.get("EXTRACT_WINDOW_SIZE", str(window_size)))
         window_size = env_ws if env_ws > 0 else window_size
@@ -480,7 +479,6 @@ def extract_counterclaims(chunks: list[str], window_size: int = 15) -> list[dict
         List of {'claim_id': int|None, 'raw_texts': list[str]} dicts
     """
     # Allow override via env var for rapid tuning
-    import os
     try:
         env_ws = int(os.environ.get("EXTRACT_WINDOW_SIZE", str(window_size)))
         window_size = env_ws if env_ws > 0 else window_size
