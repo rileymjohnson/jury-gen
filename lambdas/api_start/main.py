@@ -44,6 +44,13 @@ def lambda_handler(event, context):
         if not isinstance(config, dict):
             return _response(400, {"error": "'config' is required and must be an object"})
 
+        # Normalize and validate optional party_type
+        party_type = str(config.get("party_type", "")).strip().upper()
+        if party_type:
+            if party_type not in {"PLAINTIFF", "DEFENDANT"}:
+                return _response(400, {"error": "'party_type' must be 'PLAINTIFF' or 'DEFENDANT'"})
+            config["party_type"] = party_type
+
         if not all(isinstance(x, str) and x for x in [complaint_key, answer_key, witness_key]):
             return _response(400, {"error": "'complaint_key', 'answer_key', and 'witness_key' are required"})
 

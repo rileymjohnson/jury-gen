@@ -89,7 +89,8 @@ def lambda_handler(event, _context):
         cust = instruction_processing.generate_custom_instructions(
             claim_info=item, claim=claim, case_facts=case_facts
         )
-        out_instructions.extend(cust)
+        if cust:
+            out_instructions.append(cust)
 
     # 5xx damages per item
     try:

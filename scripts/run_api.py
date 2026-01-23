@@ -81,6 +81,7 @@ def upload_file(put_url: str, path: Path, content_type: str = "application/pdf")
 def _build_default_config() -> dict[str, Any]:
     # Provide sensible defaults for required config fields
     return {
+        "party_type": "PLAINTIFF",  # or "DEFENDANT"
         "incident_date": "2024-01-15",
         "incident_location": "Miami, Florida",
         "additional_voir_dire_info": "None.",

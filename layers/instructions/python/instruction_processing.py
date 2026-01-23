@@ -136,7 +136,15 @@ Consider:
     return "CUSTOM"
 
 
-def llm_select_instructions(claim_title, claim_elements, defenses, case_facts, available_instructions, damages=None):  # noqa: PLR0913
+def llm_select_instructions(  # noqa: PLR0913
+    claim_title,
+    claim_elements,
+    defenses,
+    case_facts,
+    available_instructions,
+    damages=None,
+    claim_references: str | None = None,
+):
     """
     LLM selects which instructions to include and returns customized versions
     """
@@ -189,6 +197,8 @@ def llm_select_instructions(claim_title, claim_elements, defenses, case_facts, a
         }
     ]
 
+    references_md = (claim_references or "").strip()
+
     prompt = f"""You are selecting and customizing jury instructions for a specific claim.
 
 CLAIM: {claim_title}
@@ -201,6 +211,9 @@ DEFENSES RAISED:
 
 CASE FACTS:
 {case_facts}
+
+REFERENCES (markdown; may include links):
+{references_md}
 
 DAMAGES REQUESTED (structured):
 {damages_text}
@@ -227,7 +240,9 @@ Example for 416.5:
 - If mixed: "Contracts may be partly written and partly oral. Oral contracts are just as valid as written contracts."
 - If fully written: Don't include this instruction at all
 
-Be thorough but conservative - only include instructions that are truly relevant."""  # noqa: E501
+Be thorough but conservative - only include instructions that are truly relevant.
+
+IMPORTANT for reasoning: Return the 'reasoning' as Markdown. When you rely on a source from REFERENCES or the defense texts, include an inline Markdown link (e.g., [Link text](https://...)) to support your reasoning. Do not fabricate links; only use those provided in REFERENCES or the provided defense texts. Keep the reasoning concise and focused on why this instruction is appropriate."""  # noqa: E501
 
     body = json.dumps(
         {
@@ -400,9 +415,23 @@ def select_and_customize_instructions(category_number, claim, claim_elements, de
         case_facts=case_facts,
         available_instructions=instructions_summary,
         damages=damages,
+        claim_references=claim.get("references"),
     )
+    # Ensure each selected instruction carries a title.
+    number_to_title = {str(i.get("number")): (i.get("title") or "") for i in instructions_summary}
+    out: list[dict] = []
+    for inst in selected or []:
+        num = str((inst or {}).get("number") or "")
+        title = (inst or {}).get("title")
+        if not title:
+            title = number_to_title.get(num)
+        if not title:
+            base = (claim or {}).get("title") or "Instruction"
+            title = f"{base} ({num})" if num else base
+        inst["title"] = title
+        out.append(inst)
 
-    return selected
+    return out
 
 
 def generate_custom_instructions(claim_info, claim, case_facts):
@@ -415,46 +444,44 @@ def generate_custom_instructions(claim_info, claim, case_facts):
         case_facts: Case facts summary
 
     Returns:
-        List of instruction dicts with customized_text and reasoning
+        Single instruction dict with customized_text and reasoning, or None
     """
     print("claim", list(claim.keys()))
 
     defenses_list = "\n".join([f"- {d['name']}: {d['raw_text']}" for d in claim_info.get("defenses", [])])
 
     elements_list = "\n".join([f"- {elem}" for elem in claim.get("elements", [])])
+    references_md = (claim.get("references") or "").strip()
 
     tools = [
         {
             "name": "generate_custom_instructions",
-            "description": "Generate custom jury instructions for a claim without standard instructions",
+            "description": "Generate ONE comprehensive custom jury instruction for a claim without standard instructions",  # noqa: E501
             "input_schema": {
                 "type": "object",
                 "properties": {
-                    "instructions": {
-                        "type": "array",
-                        "description": "List of custom instructions for this claim",
-                        "items": {
-                            "type": "object",
-                            "properties": {
-                                "customized_text": {
-                                    "type": "string",
-                                    "description": "The full text of this instruction with party names and facts filled in",  # noqa: E501
-                                },
-                                "reasoning": {
-                                    "type": "string",
-                                    "description": "Brief explanation of what this instruction covers",
-                                },
+                    "instruction": {
+                        "type": "object",
+                        "description": "Single comprehensive custom instruction",
+                        "properties": {
+                            "customized_text": {
+                                "type": "string",
+                                "description": "The full text of this instruction with party names and facts filled in",
                             },
-                            "required": ["customized_text", "reasoning"],
+                            "reasoning": {
+                                "type": "string",
+                                "description": "Brief explanation of what this instruction covers",
+                            },
                         },
+                        "required": ["customized_text", "reasoning"],
                     }
                 },
-                "required": ["instructions"],
+                "required": ["instruction"],
             },
         }
     ]
 
-    prompt = f"""Generate custom jury instructions for a claim that has no standard Florida instruction.
+    prompt = f"""Generate a single, comprehensive custom jury instruction for a claim that has no standard Florida instruction.
 
 CLAIM: {claim.get('title')}
 
@@ -470,25 +497,12 @@ DEFENSES RAISED:
 CASE FACTS:
 {case_facts}
 
-Generate a complete set of jury instructions for this claim, following the style and structure of Florida Standard Jury Instructions. You should generate multiple separate instructions covering:
+REFERENCES (markdown; may include links):
+{references_md}
 
-1. Introduction to the claim - Brief statement of what claimant alleges
-2. Essential elements - What claimant must prove (numbered list based on claim elements above)
-3. Any key definitions needed
-4. Issues the jury must decide
-5. Burden of proof - what happens if claim not proven
-6. Defense instructions - for each defense raised
-7. Burden if claim proven - what jury should do next
+Create ONE instruction that covers, in order: (1) a concise introduction; (2) essential elements the claimant must prove (numbered list based on the elements above); (3) any key definitions needed; (4) the issues the jury must decide; (5) what to do if the claim is not proven (burden of proof); (6) any defense guidance needed based on the defenses raised; and (7) what to do if the claim is proven. Use neutral, clear language and fill in party names and facts. Model the tone and structure on the 401.x and 416.x series.
 
-Use neutral, clear language. Fill in actual party names from case facts. Model after standard instructions in the 401.x and 416.x series.
-
-Example formats:
-- Introduction: "(Claimant) claims that (defendant) committed [tort/wrong] by [describe actions]..."
-- Elements: "To prove [claim], (claimant) must prove all of the following: 1. [element]; 2. [element]; 3. [element]..."
-- Issues: "The issues you must decide on (claimant)'s claim against (defendant) are whether [list issues]..."
-- Burden: "If the greater weight of the evidence does not support (claimant)'s claim, your verdict should be for (defendant)."
-
-Each instruction should be a separate item in the array."""  # noqa: E501
+IMPORTANT for reasoning: Return the 'reasoning' as Markdown. When you rely on a source from the REFERENCES or defense texts, include an inline Markdown link (e.g., [Link text](https://...)) to support your reasoning. Do not fabricate links; only use those provided in REFERENCES or the provided defense texts. Keep the reasoning concise and focused on why this instruction fits the facts/elements/defenses."""  # noqa: E501
 
     body = json.dumps(
         {
@@ -512,16 +526,21 @@ Each instruction should be a separate item in the array."""  # noqa: E501
     # Extract tool use result
     for item in response_body.get("content", []):
         if item.get("type") == "tool_use":
-            instructions = item["input"]["instructions"]
-            # Add number field for consistency with standard instructions
-            for i, inst in enumerate(instructions, 1):
-                title = (claim.get("title") or "").upper().replace(" ", "-")
-                inst["number"] = f"CUSTOM-{title}-{i}"
-                inst["claim_description"] = claim.get("description")
-                inst["claim_elements"] = claim.get("elements")
-            return instructions
+            inst = item["input"].get("instruction") or {}
+            # Assign a stable, unique-ish number using claim title + short id
+            title_slug = (claim.get("title") or "").upper().replace(" ", "-")
+            cid = str(claim_info.get("claim_id") or "").replace(" ", "")
+            cid_short = cid[:8] if cid else "X"
+            inst["number"] = f"CUSTOM-{title_slug}-{cid_short}"
+            # Ensure a readable title for the user
+            if not inst.get("title"):
+                human_title = (claim.get("title") or "Custom Instruction").strip()
+                inst["title"] = f"Custom - {human_title}"
+            inst["claim_description"] = claim.get("description")
+            inst["claim_elements"] = claim.get("elements")
+            return inst
 
-    return []
+    return None
 
 
 def _get_instruction_by_number(number: str):
@@ -678,6 +697,7 @@ def _generate_201_1(config: dict, case_facts: str, witnesses: list[dict]):
                     "number": inst.get("number"),
                     "title": inst.get("title"),
                     "customized_text": pre_text,
+                    "reasoning": "Standard preliminary instruction 201.1 (pre‑oath) tailored to this case; included before the oath is administered.",  # noqa: E501, RUF001
                     "meta": {"is_continuation_part": False},
                 }
             )
@@ -687,6 +707,7 @@ def _generate_201_1(config: dict, case_facts: str, witnesses: list[dict]):
                     "number": inst.get("number"),
                     "title": inst.get("title"),
                     "customized_text": post_text,
+                    "reasoning": "Standard preliminary instruction 201.1 (post‑oath) continuation following the oath, customized for this case.",  # noqa: E501, RUF001
                     "meta": {"is_continuation_part": True},
                 }
             )
@@ -698,6 +719,7 @@ def _generate_201_1(config: dict, case_facts: str, witnesses: list[dict]):
                     "number": inst.get("number"),
                     "title": inst.get("title"),
                     "customized_text": combined,
+                    "reasoning": "Standard preliminary instruction 201.1 customized for this case; the oath segment is omitted per court practice.",  # noqa: E501
                     "meta": {"is_continuation_part": False},
                 }
             )
@@ -756,10 +778,28 @@ def _generate_201_2(config: dict):
     )
     if not text:
         return None
+    # Build concise reasoning from toggles
+    reasons: list[str] = [
+        "Standard instruction 201.2 introducing participants and procedure; customized to this courtroom and case."
+    ]
+    if inputs.get("plaintiff_is_pro_se"):
+        reasons.append("includes pro se plaintiff guidance")
+    if inputs.get("defendant_is_pro_se"):
+        reasons.append("includes pro se defendant guidance")
+    if inputs.get("has_uim_carrier") and (inputs.get("uim_carrier_name") or ""):
+        reasons.append(f"notes {inputs.get('uim_carrier_name')} as the uninsured/underinsured motorist carrier")
+    policy = (inputs.get("electronic_device_policy") or "").strip()
+    if policy:
+        reasons.append(f"applies electronic device policy {policy}")
+    comms = inputs.get("permitted_ex_parte_communications") or []
+    if isinstance(comms, list) and comms:
+        reasons.append("reflects permitted ex parte communication topics")
+    reasoning = "; ".join(reasons)
     return {
         "number": inst.get("number"),
         "title": inst.get("title"),
         "customized_text": text,
+        "reasoning": reasoning,
     }
 
 
@@ -776,6 +816,7 @@ def _generate_201_3():
         "number": inst.get("number"),
         "title": inst.get("title"),
         "customized_text": text,
+        "reasoning": "Included as part of the standard preliminary instructions (201.3).",
     }
 
 
@@ -795,6 +836,7 @@ def _generate_101_1(config: dict):
         "number": inst.get("number"),
         "title": inst.get("title"),
         "customized_text": text,
+        "reasoning": "Juror oath (101.1) included per court practice.",
     }
 
 
@@ -810,6 +852,7 @@ def _generate_601_1():
         "number": inst.get("number"),
         "title": inst.get("title"),
         "customized_text": text,
+        "reasoning": "Standard instruction 601.1 included as general concluding guidance for jurors.",
     }
 
 
@@ -833,10 +876,15 @@ def _generate_601_2(config: dict | None = None):
     )
     if not text:
         return None
+    reasoning = (
+        "Standard instruction 601.2 on evaluating witness credibility; "
+        + ("includes expert‑witness guidance" if inputs.get("has_expert_witnesses") else "omits expert‑witness guidance")  # noqa: E501, RUF001
+    )
     return {
         "number": inst.get("number"),
         "title": inst.get("title"),
         "customized_text": text,
+        "reasoning": reasoning,
     }
 
 
@@ -856,6 +904,7 @@ def _generate_601_3(config: dict):
         "number": inst.get("number"),
         "title": inst.get("title"),
         "customized_text": text,
+        "reasoning": "Included because foreign‑language testimony will be presented (601.3).",  # noqa: RUF001
     }
 
 
@@ -893,6 +942,7 @@ def _generate_601_4(claims: list[dict], counterclaims: list[dict]):
         "number": inst.get("number"),
         "title": inst.get("title"),
         "customized_text": text,
+        "reasoning": f"Included because there are multiple claims/counterclaims (601.4; total={total}).",
     }
 
 
@@ -915,6 +965,7 @@ def _generate_601_5(config: dict):
         "number": inst.get("number"),
         "title": inst.get("title"),
         "customized_text": text,
+        "reasoning": "Included because this court gives final instructions before closing arguments (601.5).",
     }
 
 
@@ -1047,13 +1098,14 @@ def generate_instructions(claims, counterclaims, case_facts, witnesses=None, con
     for claim_info in all_custom_claims:
         claim = database_get_claim_by_id(claim_info["claim_id"])
 
-        custom_instructions = generate_custom_instructions(claim_info=claim_info, claim=claim, case_facts=case_facts)
-        all_instructions.extend(custom_instructions)
+        custom_instruction = generate_custom_instructions(
+            claim_info=claim_info, claim=claim, case_facts=case_facts
+        )
+        if custom_instruction:
+            all_instructions.append(custom_instruction)
 
     # 500-series damages instructions (insert before 600-series)
     try:
-
-
         added_numbers: set[str] = set()
         for item in processed_items:
             claim = item.get("claim") or {}
@@ -1123,5 +1175,3 @@ def generate_instructions(claims, counterclaims, case_facts, witnesses=None, con
         pass
 
     return all_instructions
-
-

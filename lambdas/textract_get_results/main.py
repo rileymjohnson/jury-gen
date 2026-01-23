@@ -22,7 +22,7 @@ s3 = boto3.client("s3")
 #
 
 
-def extract_text_chunks(text: str, max_chunk_tokens: int = 2000) -> list[str]:
+def extract_text_chunks(text: str, max_chunk_tokens: int = 8000) -> list[str]:
     """
     Chunks text by grouping sentences up to a max token limit.
     This is the fast, non-Bedrock version.
@@ -123,7 +123,15 @@ def lambda_handler(event, context):  # noqa: PLR0915
     full_text = "\n".join(all_text_lines)
 
     try:
-        chunks = extract_text_chunks(full_text)
+        # Allow dramatic increase via env var; fallback to larger default
+        try:
+            max_chunk_tokens = int(os.environ.get("CHUNK_MAX_TOKENS", "8000"))
+            if max_chunk_tokens <= 0:
+                max_chunk_tokens = 8000
+        except Exception:
+            max_chunk_tokens = 8000
+
+        chunks = extract_text_chunks(full_text, max_chunk_tokens=max_chunk_tokens)
         logger.info(f"Successfully chunked text into {len(chunks)} chunks.")
     except Exception as e:
         logger.error(f"Failed to chunk text: {e}")
