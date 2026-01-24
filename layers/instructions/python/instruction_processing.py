@@ -1143,25 +1143,29 @@ def generate_instructions(claims, counterclaims, case_facts, witnesses=None, con
 
     # 500-series damages instructions (insert before 600-series)
     try:
-        added_numbers: set[str] = set()
-        for item in processed_items:
-            claim = item.get("claim") or {}
-            claim_info = item.get("claim_info") or {}
-            flags = (claim_info.get("damages") or {}) if isinstance(claim_info, dict) else {}
-            mapping = (claim.get("damages") or {}) if isinstance(claim, dict) else {}
+        # Compute union of 5xx instruction numbers across all claims/counterclaims
+        selected_numbers: set[str] = set()
 
-            selected_numbers: list[str] = list(mapping.get("damages_instructions") or [])
-            if mapping.get("allows_punitive") and bool(flags.get("seeks_punitive")) and "503.1" not in selected_numbers:
-                    selected_numbers.append("503.1")
-
-            for num in selected_numbers:
-                num_s = str(num)
-                if num_s in added_numbers:
+        def _accumulate_from_items(items: list[dict]):
+            for info in items or []:
+                cid = (info or {}).get("claim_id")
+                if not cid:
                     continue
-                rendered = _render_instruction_by_number(num_s, inputs={})
-                if rendered:
-                    all_instructions.append(rendered)
-                    added_numbers.add(num_s)
+                db_claim = database_get_claim_by_id(cid) or {}
+                mapping = (db_claim.get("damages") or {}) if isinstance(db_claim, dict) else {}
+                for n in mapping.get("damages_instructions") or []:
+                    if n:
+                        selected_numbers.add(str(n))
+                if mapping.get("allows_punitive") and bool((info.get("damages") or {}).get("seeks_punitive")):
+                    selected_numbers.add("503.1")
+
+        _accumulate_from_items(claims)
+        _accumulate_from_items(counterclaims)
+
+        for num in sorted(selected_numbers):
+            rendered = _render_instruction_by_number(str(num), inputs={})
+            if rendered:
+                all_instructions.append(rendered)
     except Exception:
         # Do not fail the whole job if damages phase fails
         pass
