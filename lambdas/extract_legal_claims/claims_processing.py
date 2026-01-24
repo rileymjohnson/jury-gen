@@ -167,7 +167,7 @@ Return matches for ALL {len(claims)} extracted claims.""",
     print("SIX")
     response = bedrock.invoke_model(
         body=body,
-        modelId="us.anthropic.claude-3-5-sonnet-20241022-v2:0",
+        modelId="us.anthropic.claude-sonnet-4-5-20250929-v1:0",
         accept="application/json",
         contentType="application/json",
     )
@@ -277,7 +277,7 @@ Return grouped claims with:
 
     response = bedrock.invoke_model(
         body=body,
-        modelId="us.anthropic.claude-3-5-sonnet-20241022-v2:0",
+        modelId="us.anthropic.claude-sonnet-4-5-20250929-v1:0",
         accept="application/json",
         contentType="application/json",
     )
@@ -381,7 +381,7 @@ Also update the context paragraph to summarize what you've seen so far.""",
 
     response = bedrock.invoke_model(
         body=body,
-        modelId="us.anthropic.claude-3-5-sonnet-20241022-v2:0",
+        modelId="us.anthropic.claude-sonnet-4-5-20250929-v1:0",
         accept="application/json",
         contentType="application/json",
     )

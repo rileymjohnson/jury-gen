@@ -117,7 +117,7 @@ Consider:
 
     response = bedrock.invoke_model(
         body=body,
-        modelId="us.anthropic.claude-3-5-sonnet-20241022-v2:0",
+        modelId="us.anthropic.claude-sonnet-4-5-20250929-v1:0",
         accept="application/json",
         contentType="application/json",
     )
@@ -256,7 +256,7 @@ IMPORTANT for reasoning: Return the 'reasoning' as Markdown. When you rely on a 
 
     response = bedrock.invoke_model(
         body=body,
-        modelId="us.anthropic.claude-3-5-sonnet-20241022-v2:0",
+        modelId="us.anthropic.claude-sonnet-4-5-20250929-v1:0",
         accept="application/json",
         contentType="application/json",
     )
@@ -357,7 +357,7 @@ Guidance:
 
     response = bedrock.invoke_model(
         body=body,
-        modelId="us.anthropic.claude-3-5-sonnet-20241022-v2:0",
+        modelId="us.anthropic.claude-sonnet-4-5-20250929-v1:0",
         accept="application/json",
         contentType="application/json",
     )
@@ -516,7 +516,7 @@ IMPORTANT for reasoning: Return the 'reasoning' as Markdown. When you rely on a 
 
     response = bedrock.invoke_model(
         body=body,
-        modelId="us.anthropic.claude-3-5-sonnet-20241022-v2:0",
+        modelId="us.anthropic.claude-sonnet-4-5-20250929-v1:0",
         accept="application/json",
         contentType="application/json",
     )
@@ -635,7 +635,7 @@ Instructions:
 
     response = bedrock.invoke_model(
         body=body,
-        modelId="us.anthropic.claude-3-5-sonnet-20241022-v2:0",
+        modelId="us.anthropic.claude-sonnet-4-5-20250929-v1:0",
         accept="application/json",
         contentType="application/json",
     )

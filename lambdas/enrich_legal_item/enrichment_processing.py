@@ -82,7 +82,7 @@ Also update the context paragraph to summarize what defenses you've seen so far.
 
     response = bedrock.invoke_model(
         body=body,
-        modelId="us.anthropic.claude-3-5-sonnet-20241022-v2:0",
+        modelId="us.anthropic.claude-sonnet-4-5-20250929-v1:0",
         accept="application/json",
         contentType="application/json",
     )
@@ -191,7 +191,7 @@ Also update the context paragraph to summarize what damages you've seen so far."
 
     response = bedrock.invoke_model(
         body=body,
-        modelId="us.anthropic.claude-3-5-sonnet-20241022-v2:0",
+        modelId="us.anthropic.claude-sonnet-4-5-20250929-v1:0",
         accept="application/json",
         contentType="application/json",
     )
@@ -201,7 +201,25 @@ Also update the context paragraph to summarize what damages you've seen so far."
     # Extract tool use result
     for item in response_body.get("content", []):
         if item.get("type") == "tool_use":
-            return item["input"]
+            tool_input = item["input"]
+
+            # Fix stringified damages
+            if isinstance(tool_input.get("damages"), str):
+                try:
+                    # Strip any XML garbage the model might have leaked
+                    clean = tool_input["damages"].split("</")[0].strip()
+                    tool_input["damages"] = json.loads(clean)
+                except json.JSONDecodeError:
+                    logger.warning(f"Could not parse damages: {tool_input['damages'][:200]}")
+                    tool_input["damages"] = {
+                        "compensatory": [],
+                        "punitive": [],
+                        "statutory": [],
+                        "equitable": [],
+                        "other": []
+                    }
+
+            return tool_input
 
     # Fallback if no tool use found
     return {
@@ -288,7 +306,7 @@ Return grouped defenses with:
 
     response = bedrock.invoke_model(
         body=body,
-        modelId="us.anthropic.claude-3-5-sonnet-20241022-v2:0",
+        modelId="us.anthropic.claude-sonnet-4-5-20250929-v1:0",
         accept="application/json",
         contentType="application/json",
     )
