@@ -1,6 +1,7 @@
 import gzip
 import json
 import logging
+import traceback
 
 import boto3
 
@@ -100,6 +101,7 @@ def lambda_handler(event, context):
 
     except Exception as e:
         logger.error(f"Failed during enrichment: {e!s}")
+        logger.error(traceback.format_exc())
         raise RuntimeError(f"Enrichment pipeline failed: {e!s}") from e
 
     # 4. Return the fully enriched item
