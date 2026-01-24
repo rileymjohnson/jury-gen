@@ -1151,8 +1151,7 @@ def generate_instructions(claims, counterclaims, case_facts, witnesses=None, con
             mapping = (claim.get("damages") or {}) if isinstance(claim, dict) else {}
 
             selected_numbers: list[str] = list(mapping.get("damages_instructions") or [])
-            if mapping.get("allows_punitive") and bool(flags.get("seeks_punitive")):
-                if "503.1" not in selected_numbers:
+            if mapping.get("allows_punitive") and bool(flags.get("seeks_punitive")) and "503.1" not in selected_numbers:
                     selected_numbers.append("503.1")
 
             for num in selected_numbers:

@@ -97,9 +97,8 @@ def lambda_handler(event, _context):
         flags = item.get("damages", {}) if isinstance(item, dict) else {}
         mapping = (claim or {}).get("damages") or {}
         selected_numbers = list(mapping.get("damages_instructions") or [])
-        if mapping.get("allows_punitive") and bool(flags.get("seeks_punitive")):
-            if "503.1" not in selected_numbers:
-                selected_numbers.append("503.1")
+        if mapping.get("allows_punitive") and bool(flags.get("seeks_punitive")) and "503.1" not in selected_numbers:
+            selected_numbers.append("503.1")
         for num in selected_numbers:
             rendered = instruction_processing._render_instruction_by_number(str(num), inputs={})
             if rendered:
