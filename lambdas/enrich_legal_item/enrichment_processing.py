@@ -1,6 +1,11 @@
 import json
+import logging
 
 import boto3
+
+# Set up logging
+logger = logging.getLogger()
+logger.setLevel(logging.INFO)
 
 bedrock = boto3.client("bedrock-runtime")
 
@@ -368,6 +373,9 @@ def extract_damages_for_claim(
             window_text=window_text,
             claim_type=claim_type,
         )
+
+        logger.info(f"result type: {type(result)}, damages type: {type(result.get('damages'))}")
+        logger.info(f"damages value: {result.get('damages')}")
 
         # Update context for next iteration
         current_context = result["updated_context"]
