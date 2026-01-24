@@ -372,7 +372,11 @@ def extract_damages_for_claim(
         claim_type: Either "claims" or "counterclaims"
 
     Returns:
-        Dict with categorized damages
+        Dict with boolean flags: {
+            "seeks_punitive": bool,
+            "seeks_attorneys_fees": bool,
+            "seeks_equitable_relief": bool,
+        }
     """
     all_damages = {"compensatory": [], "punitive": [], "statutory": [], "equitable": [], "other": []}
 
@@ -407,4 +411,15 @@ def extract_damages_for_claim(
         if all_damages_category:
             all_damages[category] = list(set(all_damages_category))  # Simple dedup
 
-    return all_damages
+    # Convert to simplified boolean flags of interest
+    seeks_punitive = bool(all_damages.get("punitive"))
+    seeks_equitable_relief = bool(all_damages.get("equitable"))
+    # Heuristic: attorneys' fees appear under "other" as strings containing "attorney"
+    fees_list = [s for s in (all_damages.get("other") or []) if isinstance(s, str)]
+    seeks_attorneys_fees = any("attorney" in s.lower() and "fee" in s.lower() for s in fees_list)
+
+    return {
+        "seeks_punitive": seeks_punitive,
+        "seeks_attorneys_fees": seeks_attorneys_fees,
+        "seeks_equitable_relief": seeks_equitable_relief,
+    }

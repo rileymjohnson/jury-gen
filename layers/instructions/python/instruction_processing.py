@@ -152,18 +152,30 @@ def llm_select_instructions(  # noqa: PLR0913
     instructions_list = json.dumps(available_instructions, indent=2)
     defenses_list = "\n".join([f"- {d['name']}: {d['raw_text']}" for d in defenses])
     elements_list = "\n".join([f"- {elem}" for elem in claim_elements])
-    # Optional damages context to guide 5xx selection
-    damages = damages or {}
-    def _fmt(key):
-        vals = damages.get(key) or []
+    # Optional damages context to guide 5xx selection (supports legacy and simplified formats)
+    d = (damages or {})
+    def _fmt_legacy(key):
+        vals = d.get(key) or []
         return "\n".join([f"- {v}" for v in vals]) if isinstance(vals, list) else ""
-    damages_text = (
-        "Compensatory:\n" + _fmt("compensatory") + "\n\n"
-        "Punitive:\n" + _fmt("punitive") + "\n\n"
-        "Statutory:\n" + _fmt("statutory") + "\n\n"
-        "Equitable:\n" + _fmt("equitable") + "\n\n"
-        "Other:\n" + _fmt("other")
-    )
+    if any(k in d for k in ("compensatory", "punitive", "statutory", "equitable", "other")):
+        damages_text = (
+            "Compensatory:\n" + _fmt_legacy("compensatory") + "\n\n"
+            "Punitive:\n" + _fmt_legacy("punitive") + "\n\n"
+            "Statutory:\n" + _fmt_legacy("statutory") + "\n\n"
+            "Equitable:\n" + _fmt_legacy("equitable") + "\n\n"
+            "Other:\n" + _fmt_legacy("other")
+        )
+    else:
+        seeks_punitive = bool(d.get("seeks_punitive"))
+        seeks_fees = bool(d.get("seeks_attorneys_fees"))
+        seeks_equitable = bool(d.get("seeks_equitable_relief"))
+        damages_text = "\n".join(
+            [
+                f"- Seeks punitive damages: {'yes' if seeks_punitive else 'no'}",
+                f"- Seeks attorney's fees: {'yes' if seeks_fees else 'no'}",
+                f"- Seeks equitable relief: {'yes' if seeks_equitable else 'no'}",
+            ]
+        )
 
     tools = [
         {
@@ -282,17 +294,29 @@ def llm_choose_damages_chapters(claim_title, claim_elements, defenses, case_fact
     defenses_list = "\n".join([f"- {d['name']}: {d['raw_text']}" for d in (defenses or [])])
     elements_list = "\n".join([f"- {e}" for e in (claim_elements or [])])
 
-    damages = damages or {}
-    def _fmt(key):
-        vals = damages.get(key) or []
+    d = (damages or {})
+    def _fmt_legacy(key):
+        vals = d.get(key) or []
         return "\n".join([f"- {v}" for v in vals]) if isinstance(vals, list) else ""
-    damages_text = (
-        "Compensatory:\n" + _fmt("compensatory") + "\n\n"
-        "Punitive:\n" + _fmt("punitive") + "\n\n"
-        "Statutory:\n" + _fmt("statutory") + "\n\n"
-        "Equitable:\n" + _fmt("equitable") + "\n\n"
-        "Other:\n" + _fmt("other")
-    )
+    if any(k in d for k in ("compensatory", "punitive", "statutory", "equitable", "other")):
+        damages_text = (
+            "Compensatory:\n" + _fmt_legacy("compensatory") + "\n\n"
+            "Punitive:\n" + _fmt_legacy("punitive") + "\n\n"
+            "Statutory:\n" + _fmt_legacy("statutory") + "\n\n"
+            "Equitable:\n" + _fmt_legacy("equitable") + "\n\n"
+            "Other:\n" + _fmt_legacy("other")
+        )
+    else:
+        seeks_punitive = bool(d.get("seeks_punitive"))
+        seeks_fees = bool(d.get("seeks_attorneys_fees"))
+        seeks_equitable = bool(d.get("seeks_equitable_relief"))
+        damages_text = "\n".join(
+            [
+                f"- Seeks punitive damages: {'yes' if seeks_punitive else 'no'}",
+                f"- Seeks attorney's fees: {'yes' if seeks_fees else 'no'}",
+                f"- Seeks equitable relief: {'yes' if seeks_equitable else 'no'}",
+            ]
+        )
 
     tools = [
         {
@@ -555,6 +579,19 @@ def _get_instruction_by_number(number: str):
         pass
     return None
 
+
+def _render_instruction_by_number(number: str, inputs: dict | None = None):
+    """Fetch standard instruction by number and render its text.
+
+    Returns a dict {number,title,customized_text} or None if unavailable.
+    """
+    inst = _get_instruction_by_number(number)
+    if not inst:
+        return None
+    text = _llm_render_instruction(template_text=inst.get("main_paragraph", ""), inputs=inputs or {})
+    if not text:
+        return None
+    return {"number": inst.get("number"), "title": inst.get("title"), "customized_text": text}
 
 def _llm_render_instruction(
     template_text: str,
@@ -1110,30 +1147,22 @@ def generate_instructions(claims, counterclaims, case_facts, witnesses=None, con
         for item in processed_items:
             claim = item.get("claim") or {}
             claim_info = item.get("claim_info") or {}
-            category = item.get("category")
+            flags = (claim_info.get("damages") or {}) if isinstance(claim_info, dict) else {}
+            mapping = (claim.get("damages") or {}) if isinstance(claim, dict) else {}
 
-            cat_list = llm_choose_damages_chapters(
-                claim_title=(claim or {}).get("title"),
-                claim_elements=claim.get("elements"),
-                defenses=(claim_info.get("defenses", []) if item.get("type") == "claim" else []),
-                case_facts=case_facts,
-                damages=claim_info.get("damages", {}),
-            )
-            for cat in cat_list:
-                sel = select_and_customize_instructions(
-                    category_number=cat,
-                    claim=claim,
-                    claim_elements=claim.get("elements"),
-                    defenses=(claim_info.get("defenses", []) if item.get("type") == "claim" else []),
-                    case_facts=case_facts,
-                    damages=claim_info.get("damages", {}),
-                )
-                # Deduplicate by instruction number across all claims
-                for inst in sel:
-                    num = inst.get("number")
-                    if num and num not in added_numbers:
-                        added_numbers.add(num)
-                        all_instructions.append(inst)
+            selected_numbers: list[str] = list(mapping.get("damages_instructions") or [])
+            if mapping.get("allows_punitive") and bool(flags.get("seeks_punitive")):
+                if "503.1" not in selected_numbers:
+                    selected_numbers.append("503.1")
+
+            for num in selected_numbers:
+                num_s = str(num)
+                if num_s in added_numbers:
+                    continue
+                rendered = _render_instruction_by_number(num_s, inputs={})
+                if rendered:
+                    all_instructions.append(rendered)
+                    added_numbers.add(num_s)
     except Exception:
         # Do not fail the whole job if damages phase fails
         pass

@@ -92,25 +92,18 @@ def lambda_handler(event, _context):
         if cust:
             out_instructions.append(cust)
 
-    # 5xx damages per item
+    # 5xx damages per item - deterministic from claim mapping
     try:
-        chapters = instruction_processing.llm_choose_damages_chapters(
-            claim_title=(claim or {}).get("title"),
-            claim_elements=claim.get("elements"),
-            defenses=(item.get("defenses", []) if item_type == "claim" else []),
-            case_facts=case_facts,
-            damages=item.get("damages", {}),
-        )
-        for cat in chapters:
-            sel = instruction_processing.select_and_customize_instructions(
-                category_number=cat,
-                claim=claim,
-                claim_elements=claim.get("elements"),
-                defenses=(item.get("defenses", []) if item_type == "claim" else []),
-                case_facts=case_facts,
-                damages=item.get("damages", {}),
-            )
-            out_instructions.extend(sel)
+        flags = item.get("damages", {}) if isinstance(item, dict) else {}
+        mapping = (claim or {}).get("damages") or {}
+        selected_numbers = list(mapping.get("damages_instructions") or [])
+        if mapping.get("allows_punitive") and bool(flags.get("seeks_punitive")):
+            if "503.1" not in selected_numbers:
+                selected_numbers.append("503.1")
+        for num in selected_numbers:
+            rendered = instruction_processing._render_instruction_by_number(str(num), inputs={})
+            if rendered:
+                out_instructions.append(rendered)
     except Exception:
         # Don't fail the item for damages stage
         pass
