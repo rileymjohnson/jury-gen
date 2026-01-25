@@ -59,7 +59,30 @@ resource "aws_dynamodb_table_item" "claims_items" {
     # elements: list of strings (possibly empty)
     { elements = { L = [ for s in try(each.value.elements, []) : { S = tostring(s) } ] } },
     # defenses: list of strings (possibly empty)
-    { defenses = { L = [ for s in try(each.value.defenses, []) : { S = tostring(s) } ] } }
+    { defenses = { L = [ for s in try(each.value.defenses, []) : { S = tostring(s) } ] } },
+    # damages: nested object -> DynamoDB map (M) with typed fields
+    (
+      try(each.value.damages, null) != null ? {
+        damages = {
+          M = merge(
+            # Strings (only when non-empty)
+            try(length(trimspace(tostring(each.value.damages.verdict_form))) > 0, false) ? { verdict_form = { S = tostring(each.value.damages.verdict_form) } } : {},
+            try(length(trimspace(tostring(each.value.damages.category_instruction))) > 0, false) ? { category_instruction = { S = tostring(each.value.damages.category_instruction) } } : {},
+            try(length(trimspace(tostring(each.value.damages.burden_of_proof))) > 0, false) ? { burden_of_proof = { S = tostring(each.value.damages.burden_of_proof) } } : {},
+            try(length(trimspace(tostring(each.value.damages.claim_category))) > 0, false) ? { claim_category = { S = tostring(each.value.damages.claim_category) } } : {},
+            try(length(trimspace(tostring(each.value.damages.notes))) > 0, false) ? { notes = { S = tostring(each.value.damages.notes) } } : {},
+            try(length(trimspace(tostring(each.value.damages.mapping_status))) > 0, false) ? { mapping_status = { S = tostring(each.value.damages.mapping_status) } } : {},
+            # Lists
+            { damages_instructions = { L = [ for s in try(each.value.damages.damages_instructions, []) : { S = tostring(s) } ] } },
+            # Booleans (include when not null)
+            try(each.value.damages.allows_punitive, null) != null ? { allows_punitive = { BOOL = tobool(each.value.damages.allows_punitive) } } : {},
+            try(each.value.damages.requires_clear_and_convincing, null) != null ? { requires_clear_and_convincing = { BOOL = tobool(each.value.damages.requires_clear_and_convincing) } } : {},
+            try(each.value.damages.equitable_relief, null) != null ? { equitable_relief = { BOOL = tobool(each.value.damages.equitable_relief) } } : {},
+            try(each.value.damages.generate_from_elements, null) != null ? { generate_from_elements = { BOOL = tobool(each.value.damages.generate_from_elements) } } : {}
+          )
+        }
+      } : {}
+    )
   ))
 }
 
