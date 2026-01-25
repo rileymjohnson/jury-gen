@@ -1,4 +1,5 @@
 import json
+import logging as _logging
 import os
 
 import boto3
@@ -1144,7 +1145,6 @@ def generate_instructions(claims, counterclaims, case_facts, witnesses=None, con
     # 500-series damages instructions (insert before 600-series)
     try:
         # Compute union of 5xx instruction numbers across all claims/counterclaims
-        import logging as _logging
         _log = _logging.getLogger(__name__)
         _log.info(
             "5xx-selection(core): starting; claims=%s counterclaims=%s",
