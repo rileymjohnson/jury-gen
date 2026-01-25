@@ -105,6 +105,61 @@ def lambda_handler(event, _context):  # noqa: PLR0912, PLR0915
     all_instructions.extend(non_5xx)
     all_instructions.extend(only_5xx)
 
+    # Deterministic 500-series from claim mapping (union across case)
+    try:
+        logger.info(
+            "5xx-selection: starting; claims=%s counterclaims=%s",
+            [c.get("claim_id") for c in (claims or [])],
+            [c.get("claim_id") for c in (counterclaims or [])],
+        )
+        selected_numbers: set[str] = set()
+
+        def _accumulate(items: list[dict]):
+            for info in items or []:
+                cid = (info or {}).get("claim_id")
+                if not cid:
+                    logger.info("5xx-selection: skipping item without claim_id: %s", info)
+                    continue
+                db_claim = instruction_processing.database_get_claim_by_id(cid) or {}
+                mapping = (db_claim.get("damages") or {}) if isinstance(db_claim, dict) else {}
+                logger.info(
+                    "5xx-selection: claim_id=%s mapping_keys=%s",
+                    cid,
+                    list(mapping.keys()) if isinstance(mapping, dict) else type(mapping).__name__,
+                )
+                for n in mapping.get("damages_instructions") or []:
+                    if n:
+                        selected_numbers.add(str(n))
+                        logger.info("5xx-selection: added from mapping claim_id=%s number=%s", cid, n)
+                if mapping.get("allows_punitive") and bool((info.get("damages") or {}).get("seeks_punitive")):
+                    selected_numbers.add("503.1")
+                    logger.info("5xx-selection: added punitive 503.1 for claim_id=%s", cid)
+
+        _accumulate(claims)
+        _accumulate(counterclaims)
+
+        logger.info("5xx-selection: final set=%s", sorted(selected_numbers))
+        for num in sorted(selected_numbers):
+            inst = instruction_processing._get_instruction_by_number(str(num))
+            if not inst:
+                logger.warning("5xx-selection: template not found for number=%s", num)
+                continue
+            text = instruction_processing._llm_render_instruction(
+                template_text=inst.get("main_paragraph", ""), inputs={}
+            )
+            if text:
+                logger.info("5xx-selection: rendered number=%s length=%s", num, len(text))
+                all_instructions.append({
+                    "number": inst.get("number"),
+                    "title": inst.get("title"),
+                    "customized_text": text,
+                })
+            else:
+                logger.warning("5xx-selection: render failed for number=%s", num)
+    except Exception:
+        # Do not fail the whole job if damages phase fails
+        pass
+
     # 600 series
     try:
         s601_1 = instruction_processing._generate_601_1()

@@ -1,4 +1,5 @@
 import json
+import logging as _logging
 import os
 
 import boto3
@@ -117,7 +118,7 @@ Consider:
 
     response = bedrock.invoke_model(
         body=body,
-        modelId="us.anthropic.claude-3-5-sonnet-20241022-v2:0",
+        modelId="us.anthropic.claude-sonnet-4-5-20250929-v1:0",
         accept="application/json",
         contentType="application/json",
     )
@@ -152,18 +153,30 @@ def llm_select_instructions(  # noqa: PLR0913
     instructions_list = json.dumps(available_instructions, indent=2)
     defenses_list = "\n".join([f"- {d['name']}: {d['raw_text']}" for d in defenses])
     elements_list = "\n".join([f"- {elem}" for elem in claim_elements])
-    # Optional damages context to guide 5xx selection
-    damages = damages or {}
-    def _fmt(key):
-        vals = damages.get(key) or []
+    # Optional damages context to guide 5xx selection (supports legacy and simplified formats)
+    d = (damages or {})
+    def _fmt_legacy(key):
+        vals = d.get(key) or []
         return "\n".join([f"- {v}" for v in vals]) if isinstance(vals, list) else ""
-    damages_text = (
-        "Compensatory:\n" + _fmt("compensatory") + "\n\n"
-        "Punitive:\n" + _fmt("punitive") + "\n\n"
-        "Statutory:\n" + _fmt("statutory") + "\n\n"
-        "Equitable:\n" + _fmt("equitable") + "\n\n"
-        "Other:\n" + _fmt("other")
-    )
+    if any(k in d for k in ("compensatory", "punitive", "statutory", "equitable", "other")):
+        damages_text = (
+            "Compensatory:\n" + _fmt_legacy("compensatory") + "\n\n"
+            "Punitive:\n" + _fmt_legacy("punitive") + "\n\n"
+            "Statutory:\n" + _fmt_legacy("statutory") + "\n\n"
+            "Equitable:\n" + _fmt_legacy("equitable") + "\n\n"
+            "Other:\n" + _fmt_legacy("other")
+        )
+    else:
+        seeks_punitive = bool(d.get("seeks_punitive"))
+        seeks_fees = bool(d.get("seeks_attorneys_fees"))
+        seeks_equitable = bool(d.get("seeks_equitable_relief"))
+        damages_text = "\n".join(
+            [
+                f"- Seeks punitive damages: {'yes' if seeks_punitive else 'no'}",
+                f"- Seeks attorney's fees: {'yes' if seeks_fees else 'no'}",
+                f"- Seeks equitable relief: {'yes' if seeks_equitable else 'no'}",
+            ]
+        )
 
     tools = [
         {
@@ -256,7 +269,7 @@ IMPORTANT for reasoning: Return the 'reasoning' as Markdown. When you rely on a 
 
     response = bedrock.invoke_model(
         body=body,
-        modelId="us.anthropic.claude-3-5-sonnet-20241022-v2:0",
+        modelId="us.anthropic.claude-sonnet-4-5-20250929-v1:0",
         accept="application/json",
         contentType="application/json",
     )
@@ -282,17 +295,29 @@ def llm_choose_damages_chapters(claim_title, claim_elements, defenses, case_fact
     defenses_list = "\n".join([f"- {d['name']}: {d['raw_text']}" for d in (defenses or [])])
     elements_list = "\n".join([f"- {e}" for e in (claim_elements or [])])
 
-    damages = damages or {}
-    def _fmt(key):
-        vals = damages.get(key) or []
+    d = (damages or {})
+    def _fmt_legacy(key):
+        vals = d.get(key) or []
         return "\n".join([f"- {v}" for v in vals]) if isinstance(vals, list) else ""
-    damages_text = (
-        "Compensatory:\n" + _fmt("compensatory") + "\n\n"
-        "Punitive:\n" + _fmt("punitive") + "\n\n"
-        "Statutory:\n" + _fmt("statutory") + "\n\n"
-        "Equitable:\n" + _fmt("equitable") + "\n\n"
-        "Other:\n" + _fmt("other")
-    )
+    if any(k in d for k in ("compensatory", "punitive", "statutory", "equitable", "other")):
+        damages_text = (
+            "Compensatory:\n" + _fmt_legacy("compensatory") + "\n\n"
+            "Punitive:\n" + _fmt_legacy("punitive") + "\n\n"
+            "Statutory:\n" + _fmt_legacy("statutory") + "\n\n"
+            "Equitable:\n" + _fmt_legacy("equitable") + "\n\n"
+            "Other:\n" + _fmt_legacy("other")
+        )
+    else:
+        seeks_punitive = bool(d.get("seeks_punitive"))
+        seeks_fees = bool(d.get("seeks_attorneys_fees"))
+        seeks_equitable = bool(d.get("seeks_equitable_relief"))
+        damages_text = "\n".join(
+            [
+                f"- Seeks punitive damages: {'yes' if seeks_punitive else 'no'}",
+                f"- Seeks attorney's fees: {'yes' if seeks_fees else 'no'}",
+                f"- Seeks equitable relief: {'yes' if seeks_equitable else 'no'}",
+            ]
+        )
 
     tools = [
         {
@@ -357,7 +382,7 @@ Guidance:
 
     response = bedrock.invoke_model(
         body=body,
-        modelId="us.anthropic.claude-3-5-sonnet-20241022-v2:0",
+        modelId="us.anthropic.claude-sonnet-4-5-20250929-v1:0",
         accept="application/json",
         contentType="application/json",
     )
@@ -516,7 +541,7 @@ IMPORTANT for reasoning: Return the 'reasoning' as Markdown. When you rely on a 
 
     response = bedrock.invoke_model(
         body=body,
-        modelId="us.anthropic.claude-3-5-sonnet-20241022-v2:0",
+        modelId="us.anthropic.claude-sonnet-4-5-20250929-v1:0",
         accept="application/json",
         contentType="application/json",
     )
@@ -555,6 +580,19 @@ def _get_instruction_by_number(number: str):
         pass
     return None
 
+
+def _render_instruction_by_number(number: str, inputs: dict | None = None):
+    """Fetch standard instruction by number and render its text.
+
+    Returns a dict {number,title,customized_text} or None if unavailable.
+    """
+    inst = _get_instruction_by_number(number)
+    if not inst:
+        return None
+    text = _llm_render_instruction(template_text=inst.get("main_paragraph", ""), inputs=inputs or {})
+    if not text:
+        return None
+    return {"number": inst.get("number"), "title": inst.get("title"), "customized_text": text}
 
 def _llm_render_instruction(
     template_text: str,
@@ -635,7 +673,7 @@ Instructions:
 
     response = bedrock.invoke_model(
         body=body,
-        modelId="us.anthropic.claude-3-5-sonnet-20241022-v2:0",
+        modelId="us.anthropic.claude-sonnet-4-5-20250929-v1:0",
         accept="application/json",
         contentType="application/json",
     )
@@ -1106,34 +1144,46 @@ def generate_instructions(claims, counterclaims, case_facts, witnesses=None, con
 
     # 500-series damages instructions (insert before 600-series)
     try:
-        added_numbers: set[str] = set()
-        for item in processed_items:
-            claim = item.get("claim") or {}
-            claim_info = item.get("claim_info") or {}
-            category = item.get("category")
+        # Compute union of 5xx instruction numbers across all claims/counterclaims
+        _log = _logging.getLogger(__name__)
+        _log.info(
+            "5xx-selection(core): starting; claims=%s counterclaims=%s",
+            [c.get("claim_id") for c in (claims or [])],
+            [c.get("claim_id") for c in (counterclaims or [])],
+        )
+        selected_numbers: set[str] = set()
 
-            cat_list = llm_choose_damages_chapters(
-                claim_title=(claim or {}).get("title"),
-                claim_elements=claim.get("elements"),
-                defenses=(claim_info.get("defenses", []) if item.get("type") == "claim" else []),
-                case_facts=case_facts,
-                damages=claim_info.get("damages", {}),
-            )
-            for cat in cat_list:
-                sel = select_and_customize_instructions(
-                    category_number=cat,
-                    claim=claim,
-                    claim_elements=claim.get("elements"),
-                    defenses=(claim_info.get("defenses", []) if item.get("type") == "claim" else []),
-                    case_facts=case_facts,
-                    damages=claim_info.get("damages", {}),
+        def _accumulate_from_items(items: list[dict]):
+            for info in items or []:
+                cid = (info or {}).get("claim_id")
+                if not cid:
+                    continue
+                db_claim = database_get_claim_by_id(cid) or {}
+                mapping = (db_claim.get("damages") or {}) if isinstance(db_claim, dict) else {}
+                _log.info(
+                    "5xx-selection(core): cid=%s mapping_keys=%s",
+                    cid,
+                    list(mapping.keys()) if isinstance(mapping, dict) else type(mapping).__name__,
                 )
-                # Deduplicate by instruction number across all claims
-                for inst in sel:
-                    num = inst.get("number")
-                    if num and num not in added_numbers:
-                        added_numbers.add(num)
-                        all_instructions.append(inst)
+                for n in mapping.get("damages_instructions") or []:
+                    if n:
+                        selected_numbers.add(str(n))
+                        _log.info("5xx-selection(core): add mapping number=%s for cid=%s", n, cid)
+                if mapping.get("allows_punitive") and bool((info.get("damages") or {}).get("seeks_punitive")):
+                    selected_numbers.add("503.1")
+                    _log.info("5xx-selection(core): add 503.1 punitive for cid=%s", cid)
+
+        _accumulate_from_items(claims)
+        _accumulate_from_items(counterclaims)
+
+        _log.info("5xx-selection(core): final set=%s", sorted(selected_numbers))
+        for num in sorted(selected_numbers):
+            rendered = _render_instruction_by_number(str(num), inputs={})
+            if rendered:
+                _log.info("5xx-selection(core): rendered %s", num)
+                all_instructions.append(rendered)
+            else:
+                _log.warning("5xx-selection(core): render failed for %s", num)
     except Exception:
         # Do not fail the whole job if damages phase fails
         pass
