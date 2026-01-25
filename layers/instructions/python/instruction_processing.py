@@ -1144,6 +1144,13 @@ def generate_instructions(claims, counterclaims, case_facts, witnesses=None, con
     # 500-series damages instructions (insert before 600-series)
     try:
         # Compute union of 5xx instruction numbers across all claims/counterclaims
+        import logging as _logging
+        _log = _logging.getLogger(__name__)
+        _log.info(
+            "5xx-selection(core): starting; claims=%s counterclaims=%s",
+            [c.get("claim_id") for c in (claims or [])],
+            [c.get("claim_id") for c in (counterclaims or [])],
+        )
         selected_numbers: set[str] = set()
 
         def _accumulate_from_items(items: list[dict]):
@@ -1153,19 +1160,30 @@ def generate_instructions(claims, counterclaims, case_facts, witnesses=None, con
                     continue
                 db_claim = database_get_claim_by_id(cid) or {}
                 mapping = (db_claim.get("damages") or {}) if isinstance(db_claim, dict) else {}
+                _log.info(
+                    "5xx-selection(core): cid=%s mapping_keys=%s",
+                    cid,
+                    list(mapping.keys()) if isinstance(mapping, dict) else type(mapping).__name__,
+                )
                 for n in mapping.get("damages_instructions") or []:
                     if n:
                         selected_numbers.add(str(n))
+                        _log.info("5xx-selection(core): add mapping number=%s for cid=%s", n, cid)
                 if mapping.get("allows_punitive") and bool((info.get("damages") or {}).get("seeks_punitive")):
                     selected_numbers.add("503.1")
+                    _log.info("5xx-selection(core): add 503.1 punitive for cid=%s", cid)
 
         _accumulate_from_items(claims)
         _accumulate_from_items(counterclaims)
 
+        _log.info("5xx-selection(core): final set=%s", sorted(selected_numbers))
         for num in sorted(selected_numbers):
             rendered = _render_instruction_by_number(str(num), inputs={})
             if rendered:
+                _log.info("5xx-selection(core): rendered %s", num)
                 all_instructions.append(rendered)
+            else:
+                _log.warning("5xx-selection(core): render failed for %s", num)
     except Exception:
         # Do not fail the whole job if damages phase fails
         pass
