@@ -33,15 +33,29 @@ resource "aws_dynamodb_table" "standard_jury_instructions" {
   }
 }
 
+# Standard reference data: Model Verdict Forms (separate table)
+resource "aws_dynamodb_table" "model_verdict_forms" {
+  name         = "ModelVerdictForms${local.env_suffix}"
+  billing_mode = "PAY_PER_REQUEST"
+  hash_key     = "id"
+
+  attribute {
+    name = "id"
+    type = "S"
+  }
+}
+
 # Option B: Pure Terraform seeding using aws_dynamodb_table_item
 # Reads JSON files at plan/apply time and creates one resource per item.
 locals {
   claims_raw = jsondecode(file("${path.module}/data/claims.json"))
   sji_raw    = jsondecode(file("${path.module}/data/standard_jury_instructions.json"))
+  mvf_raw    = jsondecode(file("${path.module}/data/model_verdict_forms.json"))
 
   # Only include items with a non-empty id
   claims_map = { for o in local.claims_raw : o.id => o if try(length(trimspace(tostring(o.id))) > 0, false) }
   sji_map    = { for o in local.sji_raw    : o.id => o if try(length(trimspace(tostring(o.id))) > 0, false) }
+  mvf_map    = { for o in local.mvf_raw    : o.id => o if try(length(trimspace(tostring(o.id))) > 0, false) }
 }
 
 resource "aws_dynamodb_table_item" "claims_items" {
@@ -100,6 +114,25 @@ resource "aws_dynamodb_table_item" "sji_items" {
     try(length(trimspace(tostring(each.value.category_number))) > 0, false) ? { category_number = { S = tostring(each.value.category_number) } } : {},
     try(length(trimspace(tostring(each.value.url))) > 0, false) ? { url = { S = tostring(each.value.url) } } : {},
     # Only store text when non-empty (omit when null/empty)
+    try(length(trimspace(tostring(each.value.main_paragraph))) > 0, false) ? { main_paragraph = { S = tostring(each.value.main_paragraph) } } : {},
+    try(length(trimspace(tostring(each.value.notes_on_use))) > 0, false) ? { notes_on_use = { S = tostring(each.value.notes_on_use) } } : {}
+  ))
+}
+
+# Seed Model Verdict Forms items from JSON
+resource "aws_dynamodb_table_item" "model_verdict_forms_items" {
+  for_each   = local.mvf_map
+  table_name = aws_dynamodb_table.model_verdict_forms.name
+  hash_key   = "id"
+
+  # Explicit schema for Model Verdict Forms items — mirrors SJI fields
+  item = jsonencode(merge(
+    { id = { S = tostring(each.value.id) } },
+    try(length(trimspace(tostring(each.value.number))) > 0, false) ? { number = { S = tostring(each.value.number) } } : {},
+    try(length(trimspace(tostring(each.value.title))) > 0, false) ? { title = { S = tostring(each.value.title) } } : {},
+    try(length(trimspace(tostring(each.value.category_title))) > 0, false) ? { category_title = { S = tostring(each.value.category_title) } } : {},
+    try(length(trimspace(tostring(each.value.category_number))) > 0, false) ? { category_number = { S = tostring(each.value.category_number) } } : {},
+    try(length(trimspace(tostring(each.value.url))) > 0, false) ? { url = { S = tostring(each.value.url) } } : {},
     try(length(trimspace(tostring(each.value.main_paragraph))) > 0, false) ? { main_paragraph = { S = tostring(each.value.main_paragraph) } } : {},
     try(length(trimspace(tostring(each.value.notes_on_use))) > 0, false) ? { notes_on_use = { S = tostring(each.value.notes_on_use) } } : {}
   ))
