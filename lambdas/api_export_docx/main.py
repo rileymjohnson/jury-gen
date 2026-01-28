@@ -27,7 +27,102 @@ def _response(status_code: int, body: dict, *, headers: dict | None = None):
     }
 
 
-def build_docx(instructions: list[dict], party_type: str) -> bytes:
+def _set_body_font(p, *, bold=False, italic=False):
+    try:
+        run = p.runs[0]
+    except IndexError:
+        run = p.add_run("")
+    run.font.name = 'Times New Roman'
+    run.font.size = Pt(12)
+    run.bold = bool(bold)
+    run.italic = bool(italic)
+
+
+def _append_verdict_form(document: Document, verdict_form: dict | None) -> None:  # noqa: PLR0912, PLR0915
+    if not isinstance(verdict_form, dict):
+        return
+    title_p = document.add_paragraph("JURY VERDICT FORM")
+    title_p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    _set_body_font(title_p, bold=True)
+
+    # Parties header (optional, useful context)
+    parties = []
+    p_name = (verdict_form.get("plaintiff") or "Plaintiff")
+    d_name = (verdict_form.get("defendant") or "Defendant")
+    parties.append(f"Plaintiff: {p_name}")
+    parties.append(f"Defendant: {d_name}")
+    hdr = document.add_paragraph("\n".join(parties))
+    _set_body_font(hdr)
+
+    sections = verdict_form.get("sections") or []
+    for sec in sections:
+        # Section title
+        st = str((sec or {}).get("title") or "").strip()
+        if st:
+            sp = document.add_paragraph(st.upper())
+            sp.alignment = WD_ALIGN_PARAGRAPH.LEFT
+            _set_body_font(sp, bold=True)
+
+        if (sec or {}).get("type") == "apportionment":
+            instr = (sec or {}).get("instruction") or "If you found negligence, state percentage of fault. Total must equal 100%."  # noqa: E501
+            ip = document.add_paragraph(instr)
+            _set_body_font(ip)
+            parties = (sec or {}).get("parties") or []
+            for name in parties:
+                line = document.add_paragraph(f"{name}: ______ %")
+                _set_body_font(line)
+            continue
+
+        # Standard claim blocks
+        for claim in (sec or {}).get("claims") or []:
+            ct = str((claim or {}).get("claim_title") or "").strip()
+            if ct:
+                cp = document.add_paragraph(ct)
+                _set_body_font(cp, bold=True)
+
+            # Questions
+            for q in (claim or {}).get("questions") or []:
+                qnum = q.get("number")
+                qtext = q.get("text") or ""
+                qtype = q.get("type") or ""
+                if isinstance(qnum, int):
+                    qp = document.add_paragraph(f"{qnum}. {qtext}")
+                else:
+                    qp = document.add_paragraph(str(qtext))
+                _set_body_font(qp)
+
+                rt = (q.get("response_type") or "").lower()
+                if rt == "yes_no":
+                    yn = document.add_paragraph("Yes _____    No _____")
+                    _set_body_font(yn)
+                if qtype == "setoff" and (q.get("followup") or ""):
+                    fu = document.add_paragraph(q.get("followup"))
+                    _set_body_font(fu)
+
+                # Instruction-only row (no number)
+                if qtype == "instruction" and not q.get("number"):
+                    ip = document.add_paragraph(q.get("text") or "")
+                    _set_body_font(ip)
+
+            # Damages block (if present)
+            dmg = (claim or {}).get("damages") or None
+            if isinstance(dmg, dict):
+                p = document.add_paragraph(dmg.get("question") or "Damages:")
+                _set_body_font(p)
+                amt = document.add_paragraph("$________________________")
+                _set_body_font(amt)
+                pun = dmg.get("punitive") or None
+                if isinstance(pun, dict):
+                    pp = document.add_paragraph(pun.get("question") or "Punitive damages:")
+                    _set_body_font(pp)
+                    yn = document.add_paragraph("Yes _____    No _____")
+                    _set_body_font(yn)
+                    if pun.get("followup"):
+                        fu = document.add_paragraph(pun["followup"])
+                        _set_body_font(fu)
+
+
+def build_docx(instructions: list[dict], party_type: str, *, verdict_form: dict | None) -> bytes:
     document = Document()
 
     for section in document.sections:
@@ -83,6 +178,10 @@ Withdrawn ___________'''.strip())
 
         run.add_break(WD_BREAK.PAGE)
 
+    # Append verdict form after instructions if present
+    if verdict_form:
+        _append_verdict_form(document, verdict_form)
+
     out = BytesIO()
     document.save(out)
     return out.getvalue()
@@ -112,7 +211,8 @@ def lambda_handler(event, context):
         if not isinstance(instructions, list):
             return _response(500, {"error": "Invalid instructions format"})
 
-        docx_bytes = build_docx(instructions, party_type)
+        verdict_form = item.get("verdict_form")
+        docx_bytes = build_docx(instructions, party_type, verdict_form=verdict_form)
         b64 = base64.b64encode(docx_bytes).decode("ascii")
 
         filename = f"JuryInstructions-{job_id}.docx"
