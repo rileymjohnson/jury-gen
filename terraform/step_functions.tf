@@ -326,7 +326,8 @@ resource "aws_sfn_state_machine" "jury_app_workflow" {
                         "item.$": "$.item",
                         "type": "claim",
                         "complaint_chunks.$": "$.complaint_chunks",
-                        "answer_chunks.$": "$.answer_chunks"
+                        "answer_chunks.$": "$.answer_chunks",
+                        "all_claims.$": "$.all_claims"
                       },
                       "End": true
                     }
@@ -361,7 +362,8 @@ resource "aws_sfn_state_machine" "jury_app_workflow" {
                         "item.$": "$.item",
                         "type": "counterclaim",
                         "complaint_chunks.$": "$.complaint_chunks",
-                        "answer_chunks.$": "$.answer_chunks"
+                        "answer_chunks.$": "$.answer_chunks",
+                        "all_claims.$": "$.all_claims"
                       },
                       "End": true
                     }

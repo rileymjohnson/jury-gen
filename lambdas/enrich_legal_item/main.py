@@ -81,15 +81,29 @@ def lambda_handler(event, context):
 
             # 2. Defenses are in the ANSWER
             logger.info("Extracting defenses from answer chunks...")
-            defenses = enrichment_processing.extract_raw_defenses_for_claim(
+            raw_defenses = enrichment_processing.extract_raw_defenses_for_claim(
                 claim_context=claim_context, answer_chunks=answer_chunks, window_size=3
             )
             # Classify defenses and assign applies_to_claims
             defenses = enrichment_processing.classify_defenses(
-                defenses=defenses,
+                defenses=raw_defenses,
                 all_claims=all_claims,
                 current_claim_id=item.get("claim_id"),
             )
+            # Keep only defenses that the model mapped to this claim
+            try:
+                cid = item.get("claim_id")
+                classified_total = len(defenses or [])
+                filtered = [d for d in (defenses or []) if cid and cid in (d.get("applies_to_claims") or [])]
+                logger.info(
+                    "Enrichment: claim_id=%s defenses_classified=%s defenses_applicable=%s",
+                    cid,
+                    classified_total,
+                    len(filtered),
+                )
+                defenses = filtered
+            except Exception:
+                pass
 
         else:  # item_type == "counterclaim"
             # --- For a DEFENDANT'S COUNTERCLAIM ---

@@ -385,7 +385,7 @@ def _db_get_claim_basic(claim_id: str) -> dict | None:
 def classify_defenses(defenses: list[dict], all_claims: list[dict], current_claim_id: str | None = None) -> list[dict]:
     """Add 'type' and 'applies_to_claims' to each defense via LLM classification.
 
-    If the model fails, default type='complete' and applies_to_claims=[current_claim_id] when available.
+    If the model fails, default type='complete' and leaves applies_to_claims empty.
     """
     if not defenses:
         return []
@@ -490,8 +490,6 @@ def classify_defenses(defenses: list[dict], all_claims: list[dict], current_clai
                     raw = (d or {}).get("raw_text") or ""
                     typ = (d or {}).get("type") or "complete"
                     applies = (d or {}).get("applies_to_claims") or []
-                    if not applies and current_claim_id:
-                        applies = [current_claim_id]
                     out.append({
                         "name": name,
                         "raw_text": raw,
@@ -503,12 +501,12 @@ def classify_defenses(defenses: list[dict], all_claims: list[dict], current_clai
     except Exception:
         pass
 
-    # Fallback: default everything to complete, applies only to current claim
+    # Fallback: default everything to complete, with no applies_to_claims mapping
     fallback: list[dict] = [{
         "name": d.get("name"),
         "raw_text": d.get("raw_text"),
         "type": "complete",
-        "applies_to_claims": ([current_claim_id] if current_claim_id else []),
+        "applies_to_claims": [],
     } for d in defenses]
 
     return fallback
