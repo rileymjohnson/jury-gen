@@ -70,7 +70,10 @@ def _build_claim_block(item: dict, claimant: str, defendant: str, start_q: int) 
             applicable.append(d)
 
     complete_defs = [d for d in applicable if (d.get("type") or "complete") == "complete"]
-    setoff_defs = [d for d in applicable if (d.get("type") or "") == "setoff"]
+    # Only include setoff for contract claims; suppress for others (e.g., defamation)
+    setoff_defs = []
+    if (category or "").lower() == "contract":
+        setoff_defs = [d for d in applicable if (d.get("type") or "") == "setoff"]
 
     defense_start = q
     for d in complete_defs:
@@ -84,10 +87,17 @@ def _build_claim_block(item: dict, claimant: str, defendant: str, start_q: int) 
         q += 1
 
     if complete_defs:
-        questions.append({
-            "type": "instruction",
-            "text": f"If YES to any of questions {defense_start}-{q-1}, verdict for {defendant}. If NO to all, continue.",  # noqa: E501
-        })
+        count = len(complete_defs)
+        if count == 1:
+            questions.append({
+                "type": "instruction",
+                "text": f"If YES to question {defense_start}, verdict for {defendant}. If NO, continue.",
+            })
+        else:
+            questions.append({
+                "type": "instruction",
+                "text": f"If YES to any of questions {defense_start}-{q-1}, verdict for {defendant}. If NO to all, continue.",  # noqa: E501
+            })
 
     for d in setoff_defs:
         questions.append({
@@ -130,7 +140,7 @@ def _generate_verdict_form(claims: list[dict], counterclaims: list[dict], case_f
     plaintiff, defendant = _extract_party_names(config, case_facts)
     sections: list[dict] = []
     qnum = 1
-    has_tort = False
+    has_negligence = False
 
     # Plaintiff's claims
     p_claims: list[dict] = []
@@ -139,8 +149,9 @@ def _generate_verdict_form(claims: list[dict], counterclaims: list[dict], case_f
         p_claims.append(blk)
         db_claim = instruction_processing.database_get_claim_by_id(c.get("claim_id")) or {}
         cat = ((db_claim.get("damages") or {}).get("claim_category") or db_claim.get("claim_category") or "").lower()
-        if cat in {"tort", "negligence"}:
-            has_tort = True
+        title_l = (db_claim.get("title") or "").lower()
+        if cat == "negligence" or ("negligence" in title_l) or ("negligent" in title_l):
+            has_negligence = True
     sections.append({"title": "PLAINTIFF'S CLAIMS", "claims": p_claims})
 
     # Defendant's counterclaims
@@ -151,11 +162,12 @@ def _generate_verdict_form(claims: list[dict], counterclaims: list[dict], case_f
             d_claims.append(blk)
             db_claim = instruction_processing.database_get_claim_by_id(c.get("claim_id")) or {}
             cat = ((db_claim.get("damages") or {}).get("claim_category") or db_claim.get("claim_category") or "").lower()  # noqa: E501
-            if cat in {"tort", "negligence"}:
-                has_tort = True
+            title_l = (db_claim.get("title") or "").lower()
+            if cat == "negligence" or ("negligence" in title_l) or ("negligent" in title_l):
+                has_negligence = True
         sections.append({"title": "DEFENDANT'S COUNTERCLAIMS", "claims": d_claims})
 
-    if has_tort:
+    if has_negligence:
         sections.append({
             "title": "APPORTIONMENT OF FAULT",
             "type": "apportionment",
