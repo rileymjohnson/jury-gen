@@ -51,6 +51,7 @@ def lambda_handler(event, context):
         # We also get all chunks
         complaint_chunks = _load_chunks(event.get("complaint_chunks", []))
         answer_chunks = _load_chunks(event.get("answer_chunks", []))
+        all_claims = event.get("all_claims") or []
 
         if not item or not item_type:
             raise ValueError("Input event must contain 'item' and 'type'")
@@ -82,6 +83,12 @@ def lambda_handler(event, context):
             logger.info("Extracting defenses from answer chunks...")
             defenses = enrichment_processing.extract_raw_defenses_for_claim(
                 claim_context=claim_context, answer_chunks=answer_chunks, window_size=3
+            )
+            # Classify defenses and assign applies_to_claims
+            defenses = enrichment_processing.classify_defenses(
+                defenses=defenses,
+                all_claims=all_claims,
+                current_claim_id=item.get("claim_id"),
             )
 
         else:  # item_type == "counterclaim"

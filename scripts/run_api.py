@@ -399,6 +399,7 @@ def run(  # noqa: PLR0912, PLR0913, PLR0915
         "claims": last_status.get("claims"),
         "counterclaims": last_status.get("counterclaims"),
         "instructions": last_status.get("jury_instructions_text"),
+        "verdict_form": last_status.get("verdict_form"),
         "source_files": last_status.get("source_files"),
         "createdAt": last_status.get("createdAt"),
         "completedAt": last_status.get("completedAt"),

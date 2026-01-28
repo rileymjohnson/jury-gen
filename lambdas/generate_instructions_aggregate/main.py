@@ -19,6 +19,153 @@ def _unique_by_number(instructions: list[dict]) -> list[dict]:
     return out
 
 
+def _extract_party_names(config: dict, case_facts: str) -> tuple[str, str]:
+    p = (config or {}).get("plaintiff_name") or "Plaintiff"
+    d = (config or {}).get("defendant_name") or "Defendant"
+    # Simple fallback heuristics from case_facts could be added here if needed
+    return p, d
+
+
+def _liability_question_for(category: str, title: str, claimant: str, defendant: str) -> str:
+    cat = (category or "").lower()
+    base = (title or "the claim").strip()
+    templates = {
+        "contract": f"Did {defendant} breach the contract with {claimant}, and was that breach a legal cause of damage to {claimant}?",  # noqa: E501
+        "tort": f"Was there {base.lower()} on the part of {defendant} which was a legal cause of damage to {claimant}?",
+        "defamation": f"Did {defendant} make a false and defamatory statement about {claimant}, publish it to a third party, and was {claimant} damaged as a result?",  # noqa: E501
+        "fraud": f"Did {claimant} prove by clear and convincing evidence that {defendant} committed fraud against {claimant}?",  # noqa: E501
+        "fiduciary": f"Did {defendant} breach a fiduciary duty owed to {claimant}, and was that breach a legal cause of damage to {claimant}?",  # noqa: E501
+        "conversion": f"Did {defendant} commit conversion of {claimant}'s property?",
+        "equitable": f"Is {claimant} entitled to {base.lower()}?",
+    }
+    return templates.get(cat, f"Did {defendant} commit {base.lower()} against {claimant}?")
+
+
+def _build_claim_block(item: dict, claimant: str, defendant: str, start_q: int) -> tuple[dict, int]:
+    q = start_q
+    claim_id = item.get("claim_id")
+    db_claim = instruction_processing.database_get_claim_by_id(claim_id) or {}
+    title = db_claim.get("title") or item.get("claim_title") or "Unknown"
+    category = ((db_claim.get("damages") or {}).get("claim_category") or db_claim.get("claim_category") or "unknown")
+
+    questions: list[dict] = []
+
+    # 1) Liability
+    liability_text = _liability_question_for(category, title, claimant, defendant)
+    questions.append({
+        "number": q,
+        "text": liability_text,
+        "type": "liability",
+        "response_type": "yes_no",
+        "if_no": f"Verdict for {defendant}. Skip to next claim.",
+        "if_yes": "Continue to next question.",
+    })
+    q += 1
+
+    # 2) Applicable defenses (for plaintiff's claims; counterclaims have none in current workflow)
+    applicable = []
+    for d in (item.get("defenses") or []):
+        applies_ids = d.get("applies_to_claims") or []
+        if claim_id in applies_ids:
+            applicable.append(d)
+
+    complete_defs = [d for d in applicable if (d.get("type") or "complete") == "complete"]
+    setoff_defs = [d for d in applicable if (d.get("type") or "") == "setoff"]
+
+    defense_start = q
+    for d in complete_defs:
+        questions.append({
+            "number": q,
+            "text": f"Did {defendant} prove {d.get('name','').lower()}?",
+            "type": "defense",
+            "defense_name": d.get("name"),
+            "response_type": "yes_no",
+        })
+        q += 1
+
+    if complete_defs:
+        questions.append({
+            "type": "instruction",
+            "text": f"If YES to any of questions {defense_start}-{q-1}, verdict for {defendant}. If NO to all, continue.",  # noqa: E501
+        })
+
+    for d in setoff_defs:
+        questions.append({
+            "number": q,
+            "text": f"Did {defendant} prove a right to setoff?",
+            "type": "setoff",
+            "defense_name": d.get("name"),
+            "response_type": "yes_no",
+            "followup": "If YES, state amount: $________",
+        })
+        q += 1
+
+    # 3) Damages (skip for equitable claims)
+    damages_block = None
+    if (category or "").lower() != "equitable":
+        damages_block = {
+            "question": f"What is the total amount of {claimant}'s damages?",
+            "response_type": "amount",
+        }
+        if bool((item.get("damages") or {}).get("seeks_punitive")):
+            damages_block["punitive"] = {
+                "question": "Do you award punitive damages?",
+                "followup": "If YES, state amount: $________",
+            }
+
+    block = {
+        "claim_id": claim_id,
+        "claim_title": title,
+        "claimant": claimant,
+        "defendant": defendant,
+        "questions": questions,
+    }
+    if damages_block:
+        block["damages"] = damages_block
+
+    return block, q
+
+
+def _generate_verdict_form(claims: list[dict], counterclaims: list[dict], case_facts: str, config: dict) -> dict:
+    plaintiff, defendant = _extract_party_names(config, case_facts)
+    sections: list[dict] = []
+    qnum = 1
+    has_tort = False
+
+    # Plaintiff's claims
+    p_claims: list[dict] = []
+    for c in claims or []:
+        blk, qnum = _build_claim_block(c, claimant=plaintiff, defendant=defendant, start_q=qnum)
+        p_claims.append(blk)
+        db_claim = instruction_processing.database_get_claim_by_id(c.get("claim_id")) or {}
+        cat = ((db_claim.get("damages") or {}).get("claim_category") or db_claim.get("claim_category") or "").lower()
+        if cat in {"tort", "negligence"}:
+            has_tort = True
+    sections.append({"title": "PLAINTIFF'S CLAIMS", "claims": p_claims})
+
+    # Defendant's counterclaims
+    if counterclaims:
+        d_claims: list[dict] = []
+        for c in counterclaims or []:
+            blk, qnum = _build_claim_block(c, claimant=defendant, defendant=plaintiff, start_q=qnum)
+            d_claims.append(blk)
+            db_claim = instruction_processing.database_get_claim_by_id(c.get("claim_id")) or {}
+            cat = ((db_claim.get("damages") or {}).get("claim_category") or db_claim.get("claim_category") or "").lower()  # noqa: E501
+            if cat in {"tort", "negligence"}:
+                has_tort = True
+        sections.append({"title": "DEFENDANT'S COUNTERCLAIMS", "claims": d_claims})
+
+    if has_tort:
+        sections.append({
+            "title": "APPORTIONMENT OF FAULT",
+            "type": "apportionment",
+            "instruction": "If you found negligence, state percentage of fault. Total must equal 100%.",
+            "parties": [plaintiff, defendant],
+        })
+
+    return {"plaintiff": plaintiff, "defendant": defendant, "sections": sections}
+
+
 def lambda_handler(event, _context):  # noqa: PLR0912, PLR0915
     """
     Aggregate per-item instruction results and add 100s/200s and 600s series.
@@ -196,4 +343,13 @@ def lambda_handler(event, _context):  # noqa: PLR0912, PLR0915
     except Exception:
         pass
 
-    return all_instructions
+    verdict_form = _generate_verdict_form(
+        claims=claims,
+        counterclaims=counterclaims,
+        case_facts=case_facts,
+        config=config
+    )
+
+    # Return combined object to allow downstream to access verdict_form while preserving
+    # backward-compatibility (SaveResults will handle both shapes).
+    return {"instructions": all_instructions, "verdict_form": verdict_form}

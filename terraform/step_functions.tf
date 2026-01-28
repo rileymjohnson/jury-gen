@@ -313,7 +313,8 @@ resource "aws_sfn_state_machine" "jury_app_workflow" {
                 "Parameters": {
                   "item.$": "$$.Map.Item.Value",
                   "complaint_chunks.$": "$.complaint_chunks",
-                  "answer_chunks.$": "$.answer_chunks"
+                  "answer_chunks.$": "$.answer_chunks",
+                  "all_claims.$": "$.claims"
                 },
                 "Iterator": {
                   "StartAt": "EnrichClaimItem",
@@ -347,7 +348,8 @@ resource "aws_sfn_state_machine" "jury_app_workflow" {
                 "Parameters": {
                   "item.$": "$$.Map.Item.Value",
                   "complaint_chunks.$": "$.complaint_chunks",
-                  "answer_chunks.$": "$.answer_chunks"
+                  "answer_chunks.$": "$.answer_chunks",
+                  "all_claims.$": "$.counterclaims"
                 },
                 "Iterator": {
                   "StartAt": "EnrichCounterclaimItem",
