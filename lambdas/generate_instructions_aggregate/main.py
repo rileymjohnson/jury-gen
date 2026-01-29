@@ -1,4 +1,5 @@
 import logging
+import re
 
 import instruction_processing
 
@@ -20,9 +21,57 @@ def _unique_by_number(instructions: list[dict]) -> list[dict]:
 
 
 def _extract_party_names(config: dict, case_facts: str) -> tuple[str, str]:
-    p = (config or {}).get("plaintiff_name") or "Plaintiff"
-    d = (config or {}).get("defendant_name") or "Defendant"
-    # Simple fallback heuristics from case_facts could be added here if needed
+    """Return best-guess (plaintiff, defendant) names.
+
+    Prefer config if provided and not obvious placeholders; otherwise, try to
+    parse from case_facts using a few robust patterns (caption or narrative).
+    """
+    cfg_p = (config or {}).get("plaintiff_name") or ""
+    cfg_d = (config or {}).get("defendant_name") or ""
+
+    placeholders = {"john doe", "jane doe", "rachel rowe", "plaintiff", "defendant"}
+
+    def norm(x: str) -> str:
+        return str(x or "").strip()
+
+    def is_placeholder(x: str) -> bool:
+        n = norm(x)
+        return not n or n.lower() in placeholders
+
+    def titleize(x: str) -> str:
+        x = norm(x)
+        # Handle ALL CAPS names common in captions
+        if x.isupper():
+            x = x.title()
+        return x
+
+    p = cfg_p
+    d = cfg_d
+
+    # Try caption pattern: "JENNIFER GOLD, Plaintiff, ... vs. ROGER GOLD, Defendant"
+    if (is_placeholder(p) or is_placeholder(d)) and isinstance(case_facts, str):
+        caps_pl = re.search(r"([A-Z][A-Z '\-]+),\s*Plaintiff", case_facts)
+        caps_df = re.search(r"([A-Z][A-Z '\-]+),\s*Defendant", case_facts)
+        if caps_pl and is_placeholder(p):
+            p = titleize(caps_pl.group(1))
+        if caps_df and is_placeholder(d):
+            d = titleize(caps_df.group(1))
+
+    # Try narrative pattern: "([Name]) filed a complaint ... against ([Name])"
+    if (is_placeholder(p) or is_placeholder(d)) and isinstance(case_facts, str):
+        narr = re.search(
+            r"([A-Z][a-z]+(?: [A-Z][a-z]+){0,3})\s+(?:filed|brought)\s+.*?\s+against\s+([A-Z][a-z]+(?: [A-Z][a-z]+){0,3})",  # noqa: E501
+            case_facts,
+        )
+        if narr:
+            if is_placeholder(p):
+                p = norm(narr.group(1))
+            if is_placeholder(d):
+                d = norm(narr.group(2))
+
+    # Final fallbacks
+    p = titleize(p or "Plaintiff") or "Plaintiff"
+    d = titleize(d or "Defendant") or "Defendant"
     return p, d
 
 
@@ -211,6 +260,13 @@ def lambda_handler(event, _context):  # noqa: PLR0912, PLR0915
 
     all_instructions: list[dict] = []
 
+    # Normalize party names across config using case_facts (avoid placeholders)
+    try:
+        _p, _d = _extract_party_names(config, case_facts)
+        config = {**config, "plaintiff_name": _p, "defendant_name": _d}
+    except Exception:
+        pass
+
     # 201.1 (+ optional 101.1) and then 201.2, 201.3
     try:
         parts_201_1 = instruction_processing._generate_201_1(
@@ -286,13 +342,24 @@ def lambda_handler(event, _context):  # noqa: PLR0912, PLR0915
                     continue
                 db_claim = instruction_processing.database_get_claim_by_id(cid) or {}
                 mapping = (db_claim.get("damages") or {}) if isinstance(db_claim, dict) else {}
+                cat = ((mapping.get("claim_category") or db_claim.get("claim_category") or "").lower()
+                       if isinstance(db_claim, dict) else "")
                 logger.info(
                     "5xx-selection: claim_id=%s mapping_keys=%s",
                     cid,
                     list(mapping.keys()) if isinstance(mapping, dict) else type(mapping).__name__,
                 )
                 for n in mapping.get("damages_instructions") or []:
-                    if n:
+                    if not n:
+                        continue
+                    n_str = str(n)
+                    # Filter out personal injury 501.x when claim category is not injury-related
+                    if n_str.startswith("501") and not any(w in cat for w in ("injury", "medical")):
+                        logger.info("5xx-selection: skipping %s for non-injury category=%s", n_str, cat)
+                        continue
+                    if n_str.startswith("502") and not any(w in cat for w in ("injury", "medical")):
+                        logger.info("5xx-selection: skipping %s for non-injury category=%s", n_str, cat)
+                        continue
                         selected_numbers.add(str(n))
                         logger.info("5xx-selection: added from mapping claim_id=%s number=%s", cid, n)
                 if mapping.get("allows_punitive") and bool((info.get("damages") or {}).get("seeks_punitive")):
@@ -369,4 +436,14 @@ def lambda_handler(event, _context):  # noqa: PLR0912, PLR0915
 
     # Return combined object to allow downstream to access verdict_form while preserving
     # backward-compatibility (SaveResults will handle both shapes).
-    return {"instructions": all_instructions, "verdict_form": verdict_form}
+    # Final de-duplication by instruction number, preserving first occurrence order
+    seen_nums: set[str] = set()
+    deduped: list[dict] = []
+    for inst in all_instructions:
+        num = (inst or {}).get("number")
+        if not num or num not in seen_nums:
+            deduped.append(inst)
+            if num:
+                seen_nums.add(num)
+
+    return {"instructions": deduped, "verdict_form": verdict_form}
