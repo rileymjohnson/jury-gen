@@ -116,12 +116,17 @@ def _build_claim_block(item: dict, claimant: str, defendant: str, start_q: int) 
         damages_block = {
             "question": f"What is the total amount of {claimant}'s damages?",
             "response_type": "amount",
+            "number": q,
         }
+        q += 1
         if bool((item.get("damages") or {}).get("seeks_punitive")):
             damages_block["punitive"] = {
                 "question": "Do you award punitive damages?",
                 "followup": "If YES, state amount: $________",
+                "response_type": "yes_no",
+                "number": q,
             }
+            q += 1
 
     block = {
         "claim_id": claim_id,

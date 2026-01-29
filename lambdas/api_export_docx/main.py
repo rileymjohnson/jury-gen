@@ -45,14 +45,26 @@ def _append_verdict_form(document: Document, verdict_form: dict | None) -> None:
     title_p.alignment = WD_ALIGN_PARAGRAPH.CENTER
     _set_body_font(title_p, bold=True)
 
-    # Parties header (optional, useful context)
-    parties = []
-    p_name = (verdict_form.get("plaintiff") or "Plaintiff")
-    d_name = (verdict_form.get("defendant") or "Defendant")
-    parties.append(f"Plaintiff: {p_name}")
-    parties.append(f"Defendant: {d_name}")
-    hdr = document.add_paragraph("\n".join(parties))
-    _set_body_font(hdr)
+    # Case caption with actual party names (centered)
+    def _fmt_party(n):
+        if isinstance(n, list):
+            return ", ".join([str(x).strip() for x in n if str(x).strip()])
+        return str(n or "").strip()
+
+    p_name = _fmt_party(verdict_form.get("plaintiff"))
+    d_name = _fmt_party(verdict_form.get("defendant"))
+    caption_text = None
+    if p_name and d_name:
+        caption_text = f"{p_name} v. {d_name}"
+    elif p_name:
+        caption_text = p_name
+    elif d_name:
+        caption_text = d_name
+
+    if caption_text:
+        hdr = document.add_paragraph(caption_text)
+        hdr.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        _set_body_font(hdr, bold=True)
 
     sections = verdict_form.get("sections") or []
     for sec in sections:
@@ -85,8 +97,13 @@ def _append_verdict_form(document: Document, verdict_form: dict | None) -> None:
                 qnum = q.get("number")
                 qtext = q.get("text") or ""
                 qtype = q.get("type") or ""
-                if isinstance(qnum, int):
-                    qp = document.add_paragraph(f"{qnum}. {qtext}")
+                # Ensure question numbers render even if stored as Decimal or string
+                try:
+                    qnum_int = int(qnum) if qnum is not None else None
+                except Exception:
+                    qnum_int = None
+                if qnum_int is not None:
+                    qp = document.add_paragraph(f"{qnum_int}. {qtext}")
                 else:
                     qp = document.add_paragraph(str(qtext))
                 _set_body_font(qp)
@@ -107,19 +124,48 @@ def _append_verdict_form(document: Document, verdict_form: dict | None) -> None:
             # Damages block (if present)
             dmg = (claim or {}).get("damages") or None
             if isinstance(dmg, dict):
-                p = document.add_paragraph(dmg.get("question") or "Damages:")
+                dnum = dmg.get("number")
+                try:
+                    dnum_int = int(dnum) if dnum is not None else None
+                except Exception:
+                    dnum_int = None
+                dtext = dmg.get("question") or "Damages:"
+                if dnum_int is not None:
+                    p = document.add_paragraph(f"{dnum_int}. {dtext}")
+                else:
+                    p = document.add_paragraph(dtext)
                 _set_body_font(p)
                 amt = document.add_paragraph("$________________________")
                 _set_body_font(amt)
                 pun = dmg.get("punitive") or None
                 if isinstance(pun, dict):
-                    pp = document.add_paragraph(pun.get("question") or "Punitive damages:")
+                    pnum = pun.get("number")
+                    try:
+                        pnum_int = int(pnum) if pnum is not None else None
+                    except Exception:
+                        pnum_int = None
+                    ptext = pun.get("question") or "Punitive damages:"
+                    if pnum_int is not None:
+                        pp = document.add_paragraph(f"{pnum_int}. {ptext}")
+                    else:
+                        pp = document.add_paragraph(ptext)
                     _set_body_font(pp)
                     yn = document.add_paragraph("Yes _____    No _____")
                     _set_body_font(yn)
                     if pun.get("followup"):
                         fu = document.add_paragraph(pun["followup"])
                         _set_body_font(fu)
+
+    # Foreperson signature block at the end of the verdict form
+    spacer = document.add_paragraph("")
+    _set_body_font(spacer)
+    spacer2 = document.add_paragraph("")
+    _set_body_font(spacer2)
+
+    sig = document.add_paragraph("Foreperson Signature: ______________________________")
+    _set_body_font(sig)
+    date = document.add_paragraph("Date: ____________________")
+    _set_body_font(date)
 
 
 def build_docx(instructions: list[dict], party_type: str, *, verdict_form: dict | None) -> bytes:
