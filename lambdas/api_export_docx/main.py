@@ -102,11 +102,16 @@ def _append_verdict_form(document: Document, verdict_form: dict | None) -> None:
                     qnum_int = int(qnum) if qnum is not None else None
                 except Exception:
                     qnum_int = None
-                if qnum_int is not None:
-                    qp = document.add_paragraph(f"{qnum_int}. {qtext}")
-                else:
-                    qp = document.add_paragraph(str(qtext))
-                _set_body_font(qp)
+
+                # Avoid duplicating instruction-only lines: skip main add for unnumbered instruction rows
+                added_main = False
+                if not (qtype == "instruction" and qnum_int is None):
+                    if qnum_int is not None:
+                        qp = document.add_paragraph(f"{qnum_int}. {qtext}")
+                    else:
+                        qp = document.add_paragraph(str(qtext))
+                    _set_body_font(qp)
+                    added_main = True
 
                 rt = (q.get("response_type") or "").lower()
                 if rt == "yes_no":
@@ -117,7 +122,7 @@ def _append_verdict_form(document: Document, verdict_form: dict | None) -> None:
                     _set_body_font(fu)
 
                 # Instruction-only row (no number)
-                if qtype == "instruction" and not q.get("number"):
+                if qtype == "instruction" and qnum_int is None and not added_main:
                     ip = document.add_paragraph(q.get("text") or "")
                     _set_body_font(ip)
 

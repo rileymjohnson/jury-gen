@@ -1,6 +1,7 @@
 import json
 import logging as _logging
 import os
+import re
 
 import boto3
 from boto3.dynamodb.conditions import Attr
@@ -1013,6 +1014,54 @@ def generate_instructions(claims, counterclaims, case_facts, witnesses=None, con
         config = {}
     witnesses = witnesses or []
 
+    # Normalize party names early so all downstream instructions receive real names
+    try:
+        def _norm(s: str) -> str:
+            return str(s or "").strip()
+
+        def _titleize(s: str) -> str:
+            s = _norm(s)
+            return s.title() if s.isupper() else s
+
+        placeholders = {"john doe", "jane doe", "rachel rowe", "plaintiff", "defendant"}
+
+        def _is_ph(s: str) -> bool:
+            s = _norm(s).lower()
+            return (not s) or (s in placeholders)
+
+        p = _norm(config.get("plaintiff_name"))
+        d = _norm(config.get("defendant_name"))
+
+        if _is_ph(p) or _is_ph(d):
+            # Caption style
+            m_p = re.search(r"([A-Z][A-Z '\-]+),\s*Plaintiff", case_facts or "")
+            m_d = re.search(r"([A-Z][A-Z '\-]+),\s*Defendant", case_facts or "")
+            if m_p and _is_ph(p):
+                p = _titleize(m_p.group(1))
+            if m_d and _is_ph(d):
+                d = _titleize(m_d.group(1))
+        if _is_ph(p) or _is_ph(d):
+            # Narrative style
+            m = re.search(
+                r"([A-Z][a-z]+(?: [A-Z][a-z]+){0,3})\s+(?:filed|brought)\s+.*?\s+against\s+([A-Z][a-z]+(?: [A-Z][a-z]+){0,3})",  # noqa: E501
+                case_facts or "",
+            )
+            if m:
+                if _is_ph(p):
+                    p = _norm(m.group(1))
+                if _is_ph(d):
+                    d = _norm(m.group(2))
+
+        if not p:
+            p = "Plaintiff"
+        if not d:
+            d = "Defendant"
+
+        config = {**config, "plaintiff_name": p, "defendant_name": d}
+    except Exception:
+        # Best-effort only; keep going on failure
+        pass
+
     all_instructions = []
 
     # 201.1 (pre), 101.1 (if enabled), 201.1 (post)
@@ -1160,15 +1209,26 @@ def generate_instructions(claims, counterclaims, case_facts, witnesses=None, con
                     continue
                 db_claim = database_get_claim_by_id(cid) or {}
                 mapping = (db_claim.get("damages") or {}) if isinstance(db_claim, dict) else {}
+                cat = ((mapping.get("claim_category") or db_claim.get("claim_category") or "").lower()
+                       if isinstance(db_claim, dict) else "")
                 _log.info(
                     "5xx-selection(core): cid=%s mapping_keys=%s",
                     cid,
                     list(mapping.keys()) if isinstance(mapping, dict) else type(mapping).__name__,
                 )
                 for n in mapping.get("damages_instructions") or []:
-                    if n:
-                        selected_numbers.add(str(n))
-                        _log.info("5xx-selection(core): add mapping number=%s for cid=%s", n, cid)
+                    if not n:
+                        continue
+                    n_str = str(n)
+                    # Filter out personal-injury 501.x/502.x for non-injury categories
+                    if n_str.startswith("501") and not any(w in cat for w in ("injury", "medical")):
+                        _log.info("5xx-selection(core): skip %s for non-injury category=%s", n_str, cat)
+                        continue
+                    if n_str.startswith("502") and not any(w in cat for w in ("injury", "medical")):
+                        _log.info("5xx-selection(core): skip %s for non-injury category=%s", n_str, cat)
+                        continue
+                    selected_numbers.add(n_str)
+                    _log.info("5xx-selection(core): add mapping number=%s for cid=%s", n_str, cid)
                 if mapping.get("allows_punitive") and bool((info.get("damages") or {}).get("seeks_punitive")):
                     selected_numbers.add("503.1")
                     _log.info("5xx-selection(core): add 503.1 punitive for cid=%s", cid)
