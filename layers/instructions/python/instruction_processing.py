@@ -1023,34 +1023,25 @@ def generate_instructions(claims, counterclaims, case_facts, witnesses=None, con
             s = _norm(s)
             return s.title() if s.isupper() else s
 
-        placeholders = {"john doe", "jane doe", "rachel rowe", "plaintiff", "defendant"}
-
-        def _is_ph(s: str) -> bool:
-            s = _norm(s).lower()
-            return (not s) or (s in placeholders)
-
         p = _norm(config.get("plaintiff_name"))
         d = _norm(config.get("defendant_name"))
 
-        if _is_ph(p) or _is_ph(d):
-            # Caption style
-            m_p = re.search(r"([A-Z][A-Z '\-]+),\s*Plaintiff", case_facts or "")
-            m_d = re.search(r"([A-Z][A-Z '\-]+),\s*Defendant", case_facts or "")
-            if m_p and _is_ph(p):
-                p = _titleize(m_p.group(1))
-            if m_d and _is_ph(d):
-                d = _titleize(m_d.group(1))
-        if _is_ph(p) or _is_ph(d):
-            # Narrative style
+        text = case_facts or ""
+        # Always prefer names parsed from case_facts when available
+        m_p = re.search(r"([A-Z][A-Z '\-]+),\s*Plaintiff", text)
+        m_d = re.search(r"([A-Z][A-Z '\-]+),\s*Defendant", text)
+        if m_p:
+            p = _titleize(m_p.group(1))
+        if m_d:
+            d = _titleize(m_d.group(1))
+        if not (m_p and m_d):
             m = re.search(
                 r"([A-Z][a-z]+(?: [A-Z][a-z]+){0,3})\s+(?:filed|brought)\s+.*?\s+against\s+([A-Z][a-z]+(?: [A-Z][a-z]+){0,3})",  # noqa: E501
-                case_facts or "",
+                text,
             )
             if m:
-                if _is_ph(p):
-                    p = _norm(m.group(1))
-                if _is_ph(d):
-                    d = _norm(m.group(2))
+                p = _norm(m.group(1))
+                d = _norm(m.group(2))
 
         if not p:
             p = "Plaintiff"

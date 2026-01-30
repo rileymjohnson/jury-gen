@@ -82,23 +82,23 @@ def _build_default_config() -> dict[str, Any]:
     # Provide sensible defaults for required config fields
     return {
         "party_type": "PLAINTIFF",  # or "DEFENDANT"
-        "incident_date": "2024-01-15",
-        "incident_location": "Miami, Florida",
+        "incident_date": "<incident date>",
+        "incident_location": "<incident location>",
         "additional_voir_dire_info": "None.",
         "include_so_help_you_god": True,
         "oath_administered_by": "clerk",  # "judge" or "clerk"
-        "judge_name": "Judge Smith",
-        "plaintiff_name": "John Doe",
-        "defendant_name": "Rachel Rowe",
-        "plaintiff_attorney_name": "Alex Parker",
+        "judge_name": "<judge name>",
+        "plaintiff_name": "<plaintiff name>",
+        "defendant_name": "<defendant name>",
+        "plaintiff_attorney_name": "<plaintiff attorney>",
         "plaintiff_attorney_gender": "male",
-        "defendant_attorney_name": "Morgan Lee",
+        "defendant_attorney_name": "<defendant attorney>",
         "defendant_attorney_gender": "female",
-        "court_clerk_name": "Taylor Brooks",
+        "court_clerk_name": "<clerk name>",
         "court_clerk_gender": "neutral",
-        "court_reporter_name": "Jordan Cruz",
+        "court_reporter_name": "<court reporter>",
         "court_reporter_gender": "neutral",
-        "bailiff_name": "Casey Quinn",
+        "bailiff_name": "<bailiff>",
         "bailiff_gender": "neutral",
         "electronic_device_policy": "A",
         "permitted_ex_parte_communications": [

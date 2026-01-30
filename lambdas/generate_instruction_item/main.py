@@ -92,11 +92,19 @@ def lambda_handler(event, _context):
         if cust:
             out_instructions.append(cust)
 
-    # 5xx damages per item - deterministic from claim mapping
+    # 5xx damages per item - deterministic from claim mapping (with filtering)
     try:
         flags = item.get("damages", {}) if isinstance(item, dict) else {}
         mapping = (claim or {}).get("damages") or {}
         selected_numbers = list(mapping.get("damages_instructions") or [])
+        # Filter out 501/502 personal injury / wrongful death chapters for non-injury categories
+        cat = ((mapping.get("claim_category") or (claim or {}).get("claim_category") or "").lower()
+               if isinstance(mapping, dict) else "")
+        def _is_injury_cat(s: str) -> bool:
+            s = (s or "").lower()
+            return any(w in s for w in ("injury", "medical"))
+        if not _is_injury_cat(cat):
+            selected_numbers = [n for n in selected_numbers if not str(n).startswith(("501", "502"))]
         if mapping.get("allows_punitive") and bool(flags.get("seeks_punitive")) and "503.1" not in selected_numbers:
             selected_numbers.append("503.1")
         for num in selected_numbers:

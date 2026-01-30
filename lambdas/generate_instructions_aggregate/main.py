@@ -69,6 +69,23 @@ def _extract_party_names(config: dict, case_facts: str) -> tuple[str, str]:
             if is_placeholder(d):
                 d = norm(narr.group(2))
 
+    # Always prefer names parsed from case_facts when available (override config)
+    if isinstance(case_facts, str):
+        caps_pl2 = re.search(r"([A-Z][A-Z '\-]+),\s*Plaintiff", case_facts)
+        caps_df2 = re.search(r"([A-Z][A-Z '\-]+),\s*Defendant", case_facts)
+        if caps_pl2:
+            p = titleize(caps_pl2.group(1))
+        if caps_df2:
+            d = titleize(caps_df2.group(1))
+        if not (caps_pl2 and caps_df2):
+            narr2 = re.search(
+                r"([A-Z][a-z]+(?: [A-Z][a-z]+){0,3})\s+(?:filed|brought)\s+.*?\s+against\s+([A-Z][a-z]+(?: [A-Z][a-z]+){0,3})",  # noqa: E501
+                case_facts,
+            )
+            if narr2:
+                p = titleize(narr2.group(1))
+                d = titleize(narr2.group(2))
+
     # Final fallbacks
     p = titleize(p or "Plaintiff") or "Plaintiff"
     d = titleize(d or "Defendant") or "Defendant"
