@@ -305,7 +305,7 @@ def lambda_handler(event, _context):  # noqa: PLR0912, PLR0915
         pass
 
     try:
-        si_201_2 = instruction_processing._generate_201_2(config=config)
+        si_201_2 = instruction_processing._generate_201_2(config=config, case_facts=case_facts)
         if si_201_2:
             all_instructions.append(si_201_2)
     except Exception:

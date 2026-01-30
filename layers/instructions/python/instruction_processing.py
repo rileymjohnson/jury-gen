@@ -776,18 +776,53 @@ def _pronouns_for(gender: str | None) -> dict:
     return {"subject": "they", "object": "them", "possessive_adj": "their", "reflexive": "themself"}
 
 
-def _generate_201_2(config: dict):
+def _generate_201_2(config: dict, case_facts: str | None = None):
     inst = _get_instruction_by_number("201.2")
     if not inst:
         return None
 
+    def _mask_placeholder(val: str | None) -> str:
+        s = str(val or "").strip()
+        # Replace obvious angle-bracket placeholders or empty with a blank line
+        if not s or (s.startswith("<") and s.endswith(">")):
+            return "___________"
+        return s
+
+    # Prefer deduced party names from case_facts if available for 201.2 only
+    def _deduce_party_names(text: str | None) -> tuple[str | None, str | None]:
+        if not text:
+            return None, None
+        p_name = None
+        d_name = None
+        m_p = re.search(r"([A-Z][A-Z '\-]+),\s*Plaintiff", text)
+        m_d = re.search(r"([A-Z][A-Z '\-]+),\s*Defendant", text)
+        def _titleize(s: str) -> str:
+            return s.title() if s and s.isupper() else s
+        if m_p:
+            p_name = _titleize(m_p.group(1))
+        if m_d:
+            d_name = _titleize(m_d.group(1))
+        if not (p_name and d_name):
+            m = re.search(
+                r"([A-Z][a-z]+(?: [A-Z][a-z]+){0,3})\s+(?:filed|brought)\s+.*?\s+against\s+([A-Z][a-z]+(?: [A-Z][a-z]+){0,3})",  # noqa: E501
+                text,
+            )
+            if m:
+                p_name = p_name or m.group(1)
+                d_name = d_name or m.group(2)
+        return p_name, d_name
+
+    deduced_p, deduced_d = _deduce_party_names(case_facts)
+
     inputs = {
         "judge_name": config.get("judge_name"),
-        "plaintiff_name": config.get("plaintiff_name"),
-        "defendant_name": config.get("defendant_name"),
-        "plaintiff_attorney_name": config.get("plaintiff_attorney_name"),
+        # For 201.2, prefer deduced names from case_facts when present
+        "plaintiff_name": deduced_p or config.get("plaintiff_name"),
+        "defendant_name": deduced_d or config.get("defendant_name"),
+        # Attorney placeholders map to a blank line if not provided
+        "plaintiff_attorney_name": _mask_placeholder(config.get("plaintiff_attorney_name")),
         "plaintiff_attorney_pronouns": _pronouns_for(config.get("plaintiff_attorney_gender")),
-        "defendant_attorney_name": config.get("defendant_attorney_name"),
+        "defendant_attorney_name": _mask_placeholder(config.get("defendant_attorney_name")),
         "defendant_attorney_pronouns": _pronouns_for(config.get("defendant_attorney_gender")),
         "court_clerk_name": config.get("court_clerk_name"),
         "court_clerk_pronouns": _pronouns_for(config.get("court_clerk_gender")),
@@ -1014,7 +1049,7 @@ def generate_instructions(claims, counterclaims, case_facts, witnesses=None, con
         config = {}
     witnesses = witnesses or []
 
-    # Normalize party names early so all downstream instructions receive real names
+    # Normalize party names early so downstream instructions receive real names when config has placeholders
     try:
         def _norm(s: str) -> str:
             return str(s or "").strip()
@@ -1023,25 +1058,33 @@ def generate_instructions(claims, counterclaims, case_facts, witnesses=None, con
             s = _norm(s)
             return s.title() if s.isupper() else s
 
+        placeholders = {"john doe", "jane doe", "rachel rowe", "plaintiff", "defendant"}
+
+        def _is_ph(s: str) -> bool:
+            s = _norm(s).lower()
+            return (not s) or (s in placeholders)
+
         p = _norm(config.get("plaintiff_name"))
         d = _norm(config.get("defendant_name"))
 
-        text = case_facts or ""
-        # Always prefer names parsed from case_facts when available
-        m_p = re.search(r"([A-Z][A-Z '\-]+),\s*Plaintiff", text)
-        m_d = re.search(r"([A-Z][A-Z '\-]+),\s*Defendant", text)
-        if m_p:
-            p = _titleize(m_p.group(1))
-        if m_d:
-            d = _titleize(m_d.group(1))
-        if not (m_p and m_d):
-            m = re.search(
-                r"([A-Z][a-z]+(?: [A-Z][a-z]+){0,3})\s+(?:filed|brought)\s+.*?\s+against\s+([A-Z][a-z]+(?: [A-Z][a-z]+){0,3})",  # noqa: E501
-                text,
-            )
-            if m:
-                p = _norm(m.group(1))
-                d = _norm(m.group(2))
+        if _is_ph(p) or _is_ph(d):
+            text = case_facts or ""
+            m_p = re.search(r"([A-Z][A-Z '\-]+),\s*Plaintiff", text)
+            m_d = re.search(r"([A-Z][A-Z '\-]+),\s*Defendant", text)
+            if m_p and _is_ph(p):
+                p = _titleize(m_p.group(1))
+            if m_d and _is_ph(d):
+                d = _titleize(m_d.group(1))
+            if _is_ph(p) or _is_ph(d):
+                m = re.search(
+                    r"([A-Z][a-z]+(?: [A-Z][a-z]+){0,3})\s+(?:filed|brought)\s+.*?\s+against\s+([A-Z][a-z]+(?: [A-Z][a-z]+){0,3})",  # noqa: E501
+                    text,
+                )
+                if m:
+                    if _is_ph(p):
+                        p = _norm(m.group(1))
+                    if _is_ph(d):
+                        d = _norm(m.group(2))
 
         if not p:
             p = "Plaintiff"
@@ -1079,7 +1122,7 @@ def generate_instructions(claims, counterclaims, case_facts, witnesses=None, con
 
     # 201.2 Introduction of Participants and Their Roles
     try:
-        inst_201_2 = _generate_201_2(config=config)
+        inst_201_2 = _generate_201_2(config=config, case_facts=case_facts)
         if inst_201_2:
             all_instructions.append(inst_201_2)
     except Exception:
