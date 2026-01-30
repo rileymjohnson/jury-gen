@@ -20,7 +20,7 @@ def _unique_by_number(instructions: list[dict]) -> list[dict]:
     return out
 
 
-def _extract_party_names(config: dict, case_facts: str) -> tuple[str, str]:
+def _extract_party_names(config: dict, case_facts: str) -> tuple[str, str]:  # noqa: PLR0912, PLR0915
     """Return best-guess (plaintiff, defendant) names.
 
     Prefer config if provided and not obvious placeholders; otherwise, try to
@@ -71,25 +71,56 @@ def _extract_party_names(config: dict, case_facts: str) -> tuple[str, str]:
 
     # Always prefer names parsed from case_facts when available (override config)
     if isinstance(case_facts, str):
-        caps_pl2 = re.search(r"([A-Z][A-Z '\-]+),\s*Plaintiff", case_facts)
-        caps_df2 = re.search(r"([A-Z][A-Z '\-]+),\s*Defendant", case_facts)
+        caps_pl2 = re.search(r"([A-Z][A-Z '\-\.]+),\s*Plaintiff", case_facts)
+        caps_df2 = re.search(r"([A-Z][A-Z '\-\.]+),\s*Defendant", case_facts)
         if caps_pl2:
             p = titleize(caps_pl2.group(1))
         if caps_df2:
             d = titleize(caps_df2.group(1))
         if not (caps_pl2 and caps_df2):
             narr2 = re.search(
-                r"([A-Z][a-z]+(?: [A-Z][a-z]+){0,3})\s+(?:filed|brought)\s+.*?\s+against\s+([A-Z][a-z]+(?: [A-Z][a-z]+){0,3})",  # noqa: E501
+                r"([A-Z][a-z]+(?: [A-Z][a-z]+){0,4})\s+(?:filed|brought)\s+.*?\s+against\s+([A-Z][a-z]+(?: [A-Z][a-z]+){0,4})",  # noqa: E501
                 case_facts,
             )
             if narr2:
                 p = titleize(narr2.group(1))
                 d = titleize(narr2.group(2))
+        if not (p and d):
+            m2 = re.search(
+                r"([A-Z][A-Za-z'\-\. ]+?),.*?\bas\s+plaintiff\b.*?\band\s+([A-Z][A-Za-z'\-\. ]+?)\s+\bas\s+defendant\b",
+                case_facts,
+                flags=re.IGNORECASE | re.DOTALL,
+            )
+            if m2:
+                p = titleize(m2.group(1).strip())
+                d = titleize(m2.group(2).strip())
+        if not (p and d):
+            m3p = re.search(r"([A-Z][A-Za-z'\-\. ]+)\s*\(Plaintiff\)", case_facts, flags=re.IGNORECASE)
+            m3d = re.search(r"([A-Z][A-Za-z'\-\. ]+)\s*\(Defendant\)", case_facts, flags=re.IGNORECASE)
+            if m3p and m3d:
+                p = titleize(m3p.group(1).strip())
+                d = titleize(m3d.group(1).strip())
 
     # Final fallbacks
     p = titleize(p or "Plaintiff") or "Plaintiff"
     d = titleize(d or "Defendant") or "Defendant"
     return p, d
+
+
+# Override with Bedrock-based extraction to avoid brittle regex heuristics
+def _extract_party_names(config: dict, case_facts: str) -> tuple[str, str]:
+    """Return (plaintiff, defendant) using LLM extraction; fallback to config/generic."""
+    try:
+        p_llm, d_llm = instruction_processing._llm_extract_party_names(case_facts)
+    except Exception:
+        p_llm, d_llm = None, None
+
+    cfg_p = (config or {}).get("plaintiff_name") or "Plaintiff"
+    cfg_d = (config or {}).get("defendant_name") or "Defendant"
+
+    p = (p_llm or cfg_p).strip()
+    d = (d_llm or cfg_d).strip()
+    return p or "Plaintiff", d or "Defendant"
 
 
 def _liability_question_for(category: str, title: str, claimant: str, defendant: str) -> str:
@@ -443,6 +474,43 @@ def lambda_handler(event, _context):  # noqa: PLR0912, PLR0915
             all_instructions.append(s601_5)
     except Exception:
         pass
+
+    # Consolidate duplicate 'Introduction' final instructions across series
+    def _consolidate_introductions(items: list[dict]) -> list[dict]:
+        if not isinstance(items, list):
+            return items
+        intro_nums = {"401.1", "409.1", "410.1", "451.1"}
+        phrase = "Members of the jury, you have now heard"
+        # Identify intros
+        intro_idxs = []
+        for idx, inst in enumerate(items):
+            if not isinstance(inst, dict):
+                continue
+            num = str(inst.get("number") or "").strip()
+            title = str(inst.get("title") or "").lower()
+            text = str(inst.get("customized_text") or "")
+            if (num in intro_nums) or ("introduction" in title) or (phrase in text):
+                intro_idxs.append(idx)
+        if len(intro_idxs) <= 1:
+            return items
+        # Choose preferred number order
+        pref = ["451.1", "410.1", "409.1", "401.1"]
+        chosen_idx = None
+        # Try to pick the first occurrence among preferred numbers
+        for p in pref:
+            for idx in intro_idxs:
+                if str(items[idx].get("number") or "").strip() == p:
+                    chosen_idx = idx
+                    break
+            if chosen_idx is not None:
+                break
+        # Fallback: keep the first intro encountered
+        if chosen_idx is None:
+            chosen_idx = intro_idxs[0]
+        # Filter out other intros
+        return [inst for i, inst in enumerate(items) if (i == chosen_idx) or (i not in intro_idxs)]
+
+    all_instructions = _consolidate_introductions(all_instructions)
 
     verdict_form = _generate_verdict_form(
         claims=claims,

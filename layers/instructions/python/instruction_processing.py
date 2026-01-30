@@ -35,6 +35,65 @@ def _scan_all(table, filter_expression=None):
 database_claims = _scan_all(_claims_table)
 
 
+def _llm_extract_party_names(case_facts: str | None) -> tuple[str | None, str | None]:
+    """Use Bedrock to extract (plaintiff, defendant) names from case_facts.
+
+    Returns a tuple of (plaintiff, defendant); either may be None if not found.
+    """
+    text = case_facts or ""
+    if not isinstance(text, str) or not text.strip():
+        return None, None
+
+    tools = [
+        {
+            "name": "extract_party_names",
+            "description": "Extract party names from case summary text.",
+            "input_schema": {
+                "type": "object",
+                "properties": {
+                    "plaintiff": {"type": "string", "description": "Plaintiff's full name as it appears"},
+                    "defendant": {"type": "string", "description": "Defendant's full name as it appears"},
+                },
+                "required": ["plaintiff", "defendant"],
+            },
+        }
+    ]
+
+    prompt = (
+        "Extract the exact full names for the plaintiff and the defendant from the text below.\n"
+        "Return them via the extract_party_names tool. Do not add commentary.\n\n"
+        "TEXT:\n" + text
+    )
+
+    body = json.dumps(
+        {
+            "anthropic_version": "bedrock-2023-05-31",
+            "max_tokens": 300,
+            "tools": tools,
+            "tool_choice": {"type": "tool", "name": "extract_party_names"},
+            "messages": [{"role": "user", "content": prompt}],
+        }
+    )
+
+    try:
+        response = bedrock.invoke_model(
+            body=body,
+            modelId="us.anthropic.claude-sonnet-4-5-20250929-v1:0",
+            accept="application/json",
+            contentType="application/json",
+        )
+        response_body = json.loads(response.get("body").read())
+        for item in response_body.get("content", []):
+            if item.get("type") == "tool_use":
+                inp = item.get("input") or {}
+                p = (inp.get("plaintiff") or "").strip() or None
+                d = (inp.get("defendant") or "").strip() or None
+                return p, d
+    except Exception:
+        pass
+    return None, None
+
+
 def database_get_claim_by_id(claim_id):
     try:
         resp = _claims_table.get_item(Key={"id": claim_id})
@@ -776,7 +835,7 @@ def _pronouns_for(gender: str | None) -> dict:
     return {"subject": "they", "object": "them", "possessive_adj": "their", "reflexive": "themself"}
 
 
-def _generate_201_2(config: dict, case_facts: str | None = None):
+def _generate_201_2(config: dict, case_facts: str | None = None):  # noqa: PLR0915
     inst = _get_instruction_by_number("201.2")
     if not inst:
         return None
@@ -794,8 +853,8 @@ def _generate_201_2(config: dict, case_facts: str | None = None):
             return None, None
         p_name = None
         d_name = None
-        m_p = re.search(r"([A-Z][A-Z '\-]+),\s*Plaintiff", text)
-        m_d = re.search(r"([A-Z][A-Z '\-]+),\s*Defendant", text)
+        m_p = re.search(r"([A-Z][A-Z '\-\.]+),\s*Plaintiff", text)
+        m_d = re.search(r"([A-Z][A-Z '\-\.]+),\s*Defendant", text)
         def _titleize(s: str) -> str:
             return s.title() if s and s.isupper() else s
         if m_p:
@@ -804,15 +863,31 @@ def _generate_201_2(config: dict, case_facts: str | None = None):
             d_name = _titleize(m_d.group(1))
         if not (p_name and d_name):
             m = re.search(
-                r"([A-Z][a-z]+(?: [A-Z][a-z]+){0,3})\s+(?:filed|brought)\s+.*?\s+against\s+([A-Z][a-z]+(?: [A-Z][a-z]+){0,3})",  # noqa: E501
+                r"([A-Z][a-z]+(?: [A-Z][a-z]+){0,4})\s+(?:filed|brought)\s+.*?\s+against\s+([A-Z][a-z]+(?: [A-Z][a-z]+){0,4})",  # noqa: E501
                 text,
             )
             if m:
                 p_name = p_name or m.group(1)
                 d_name = d_name or m.group(2)
+        if not (p_name and d_name):
+            m2 = re.search(
+                r"([A-Z][A-Za-z'\-\. ]+?),.*?\bas\s+plaintiff\b.*?\band\s+([A-Z][A-Za-z'\-\. ]+?)\s+\bas\s+defendant\b",
+                text,
+                flags=re.IGNORECASE | re.DOTALL,
+            )
+            if m2:
+                p_name = p_name or m2.group(1).strip()
+                d_name = d_name or m2.group(2).strip()
+        if not (p_name and d_name):
+            m3p = re.search(r"([A-Z][A-Za-z'\-\. ]+)\s*\(Plaintiff\)", text, flags=re.IGNORECASE)
+            m3d = re.search(r"([A-Z][A-Za-z'\-\. ]+)\s*\(Defendant\)", text, flags=re.IGNORECASE)
+            if m3p and m3d:
+                p_name = p_name or m3p.group(1).strip()
+                d_name = d_name or m3d.group(1).strip()
         return p_name, d_name
 
-    deduced_p, deduced_d = _deduce_party_names(case_facts)
+    # Prefer Bedrock extraction to avoid brittle regex
+    deduced_p, deduced_d = _llm_extract_party_names(case_facts)
 
     inputs = {
         "judge_name": config.get("judge_name"),
@@ -824,11 +899,11 @@ def _generate_201_2(config: dict, case_facts: str | None = None):
         "plaintiff_attorney_pronouns": _pronouns_for(config.get("plaintiff_attorney_gender")),
         "defendant_attorney_name": _mask_placeholder(config.get("defendant_attorney_name")),
         "defendant_attorney_pronouns": _pronouns_for(config.get("defendant_attorney_gender")),
-        "court_clerk_name": config.get("court_clerk_name"),
+        "court_clerk_name": _mask_placeholder(config.get("court_clerk_name")),
         "court_clerk_pronouns": _pronouns_for(config.get("court_clerk_gender")),
-        "court_reporter_name": config.get("court_reporter_name"),
+        "court_reporter_name": _mask_placeholder(config.get("court_reporter_name")),
         "court_reporter_pronouns": _pronouns_for(config.get("court_reporter_gender")),
-        "bailiff_name": config.get("bailiff_name"),
+        "bailiff_name": _mask_placeholder(config.get("bailiff_name")),
         "bailiff_pronouns": _pronouns_for(config.get("bailiff_gender")),
         "plaintiff_is_pro_se": bool(config.get("plaintiff_is_pro_se", False)),
         "defendant_is_pro_se": bool(config.get("defendant_is_pro_se", False)),
