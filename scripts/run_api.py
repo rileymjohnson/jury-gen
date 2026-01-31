@@ -14,8 +14,12 @@ from typing import Any
 import requests
 from tqdm import tqdm
 
-DEFAULT_API_URL = "https://2c4krnu3gj.execute-api.us-east-1.amazonaws.com/dev"
-DEFAULT_API_KEY = "RbqaKXztZPYB1fl6gA1Im1zfUQnTPBTG"
+# Hardcoded API endpoints/keys per environment
+DEV_API_URL = "https://2c4krnu3gj.execute-api.us-east-1.amazonaws.com/dev"
+DEV_API_KEY = "RbqaKXztZPYB1fl6gA1Im1zfUQnTPBTG"
+
+PROD_API_URL = "https://es8bfmpf40.execute-api.us-east-1.amazonaws.com/prod"
+PROD_API_KEY = "RVZp6H95s2li7iXLyRn8SktbTuat1LwW"
 
 
 def read_json(p: Path) -> Any:
@@ -562,21 +566,30 @@ def run(  # noqa: PLR0912, PLR0913, PLR0915
 def main():
     ap = argparse.ArgumentParser(description="Run remote jury-gen pipeline via API Gateway")
     ap.add_argument("--example", choices=["one", "two"], help="Which example folder to use")
-    ap.add_argument("--env", choices=["dev", "prod"], default="dev", help="Tag outputs with env (no functional change)")
+    ap.add_argument("--env", choices=["dev", "prod"], default="dev", help="Which environment to call (selects API URL/key)")  # noqa: E501
     ap.add_argument("--out", default="runs", help="Output folder root (default: runs)")
-    ap.add_argument("--api-url", default=DEFAULT_API_URL, help="Base API URL (default: dev URL)")
-    ap.add_argument("--api-key", default=DEFAULT_API_KEY, help="API key (default: dev key)")
+    ap.add_argument("--api-url", default=None, help="Override API URL (otherwise chosen by --env)")
+    ap.add_argument("--api-key", default=None, help="Override API key (otherwise chosen by --env)")
     ap.add_argument("--no-capture-history", action="store_true", help="Do not capture Step Functions execution history")
     ap.add_argument("--region", default=None, help="AWS region for Step Functions history (defaults from API URL)")
     ap.add_argument("--aws-profile", default=None, help="AWS profile to use for history capture (optional)")
     args = ap.parse_args()
 
+    # Resolve API URL/key from env unless overridden
+    if args.env == "prod":
+        default_url, default_key = PROD_API_URL, PROD_API_KEY
+    else:
+        default_url, default_key = DEV_API_URL, DEV_API_KEY
+
+    api_url = args.api_url or default_url
+    api_key = args.api_key or default_key
+
     out_dir = run(
         args.example,
         args.env,
         Path(args.out),
-        args.api_url,
-        args.api_key,
+        api_url,
+        api_key,
         capture_history=not args.no_capture_history,
         region=args.region,
         aws_profile=args.aws_profile,
