@@ -268,6 +268,7 @@ def main():  # noqa: PLR0912, PLR0915
         st.header("Controls")
         example = st.selectbox("Example", EXAMPLES, index=0)
         lambda_name = st.selectbox("Lambda", sorted(LAMBDA_DIR_MAP.keys()), index=0)
+        env = st.selectbox("Environment", ["dev", "prod"], index=0)
 
         # Region is auto-inferred from history; no manual selection
         st.divider()
@@ -291,11 +292,11 @@ def main():  # noqa: PLR0912, PLR0915
         if st.button("Run All", type="primary"):
             ensure_region(None, example)
             if lambda_name == "extract_legal_claims":
-                os.environ.setdefault("DYNAMODB_CLAIMS_TABLE_NAME", "Claims-dev")
+                os.environ.setdefault("DYNAMODB_CLAIMS_TABLE_NAME", f"Claims-{env}")
             if lambda_name == "generate_instructions":
-                os.environ.setdefault("DYNAMODB_CLAIMS_TABLE_NAME", "Claims-dev")
+                os.environ.setdefault("DYNAMODB_CLAIMS_TABLE_NAME", f"Claims-{env}")
                 os.environ.setdefault(
-                    "DYNAMODB_STANDARD_JURY_INSTRUCTIONS_TABLE_NAME", "StandardJuryInstructions-dev"
+                    "DYNAMODB_STANDARD_JURY_INSTRUCTIONS_TABLE_NAME", f"StandardJuryInstructions-{env}"
                 )
             progress = st.progress(0, text="Running all inputs...")
             total = len(files)
@@ -332,11 +333,11 @@ def main():  # noqa: PLR0912, PLR0915
             if st.button("Run Selected", type="primary"):
                 ensure_region(None, example)
                 if lambda_name == "extract_legal_claims":
-                    os.environ.setdefault("DYNAMODB_CLAIMS_TABLE_NAME", "Claims-dev")
+                    os.environ.setdefault("DYNAMODB_CLAIMS_TABLE_NAME", f"Claims-{env}")
                 if lambda_name == "generate_instructions":
-                    os.environ.setdefault("DYNAMODB_CLAIMS_TABLE_NAME", "Claims-dev")
+                    os.environ.setdefault("DYNAMODB_CLAIMS_TABLE_NAME", f"Claims-{env}")
                     os.environ.setdefault(
-                        "DYNAMODB_STANDARD_JURY_INSTRUCTIONS_TABLE_NAME", "StandardJuryInstructions-dev"
+                        "DYNAMODB_STANDARD_JURY_INSTRUCTIONS_TABLE_NAME", f"StandardJuryInstructions-{env}"
                     )
                 payload = load_json(selected)
                 if lambda_name == "generate_instructions" and not isinstance(payload.get("config"), dict):

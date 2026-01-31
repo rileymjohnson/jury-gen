@@ -97,7 +97,10 @@ Also update the context paragraph to summarize what defenses you've seen so far.
     # Extract tool use result
     for item in response_body.get("content", []):
         if item.get("type") == "tool_use":
-            return item["input"]
+            tool_input = item["input"]
+            tool_input.setdefault("updated_context", previous_context)
+            tool_input.setdefault("defenses", [])
+            return tool_input
 
     # Fallback if no tool use found
     return {"updated_context": previous_context, "defenses": []}
@@ -223,6 +226,11 @@ Also update the context paragraph to summarize what damages you've seen so far."
                         "equitable": [],
                         "other": []
                     }
+
+            tool_input.setdefault("updated_context", previous_context)
+            tool_input.setdefault("damages", {
+                "compensatory": [], "punitive": [], "statutory": [], "equitable": [], "other": []
+            })
 
             return tool_input
 
