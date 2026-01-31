@@ -57,7 +57,14 @@ def lambda_handler(event, context):
         witnesses = event.get("witnesses", [])
         claims = event.get("claims", [])
         counterclaims = event.get("counterclaims", [])
-        instructions = event.get("instructions", [])
+        instructions_field = event.get("instructions", [])
+        verdict_form = None
+        # Support both list output and object {instructions, verdict_form}
+        if isinstance(instructions_field, dict):
+            verdict_form = instructions_field.get("verdict_form")
+            instructions = instructions_field.get("instructions", [])
+        else:
+            instructions = instructions_field
 
         if not job_id:
             raise KeyError("Input event must contain 'jury_instruction_id'")
@@ -81,6 +88,7 @@ def lambda_handler(event, context):
             "#claims = :c, "
             "#counterclaims = :cc, "
             "#jury_instructions_text = :ji"
+            + (", #verdict_form = :vf" if verdict_form is not None else "")
         )
 
         expression_attribute_names = {
@@ -91,6 +99,7 @@ def lambda_handler(event, context):
             "#claims": "claims",
             "#counterclaims": "counterclaims",
             "#jury_instructions_text": "jury_instructions_text",
+            **({"#verdict_form": "verdict_form"} if verdict_form is not None else {}),
         }
 
         expression_attribute_values = {
@@ -101,6 +110,7 @@ def lambda_handler(event, context):
             ":c": claims,
             ":cc": counterclaims,
             ":ji": instructions,
+            **({":vf": verdict_form} if verdict_form is not None else {}),
         }
 
         # We must use json.loads(json.dumps(..., cls=DecimalEncoder))

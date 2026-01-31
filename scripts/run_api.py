@@ -4,6 +4,7 @@ from datetime import datetime
 import json
 import os
 from pathlib import Path
+import re
 import shutil
 import subprocess
 import sys
@@ -82,23 +83,23 @@ def _build_default_config() -> dict[str, Any]:
     # Provide sensible defaults for required config fields
     return {
         "party_type": "PLAINTIFF",  # or "DEFENDANT"
-        "incident_date": "2024-01-15",
-        "incident_location": "Miami, Florida",
+        "incident_date": "<incident date>",
+        "incident_location": "<incident location>",
         "additional_voir_dire_info": "None.",
         "include_so_help_you_god": True,
         "oath_administered_by": "clerk",  # "judge" or "clerk"
-        "judge_name": "Judge Smith",
-        "plaintiff_name": "John Doe",
-        "defendant_name": "Rachel Rowe",
-        "plaintiff_attorney_name": "Alex Parker",
+        "judge_name": "<judge name>",
+        "plaintiff_name": "<plaintiff name>",
+        "defendant_name": "<defendant name>",
+        "plaintiff_attorney_name": "<plaintiff attorney>",
         "plaintiff_attorney_gender": "male",
-        "defendant_attorney_name": "Morgan Lee",
+        "defendant_attorney_name": "<defendant attorney>",
         "defendant_attorney_gender": "female",
-        "court_clerk_name": "Taylor Brooks",
+        "court_clerk_name": "<clerk name>",
         "court_clerk_gender": "neutral",
-        "court_reporter_name": "Jordan Cruz",
+        "court_reporter_name": "<court reporter>",
         "court_reporter_gender": "neutral",
-        "bailiff_name": "Casey Quinn",
+        "bailiff_name": "<bailiff>",
         "bailiff_gender": "neutral",
         "electronic_device_policy": "A",
         "permitted_ex_parte_communications": [
@@ -118,6 +119,57 @@ def _build_default_config() -> dict[str, Any]:
         # Allowed: "before_final_argument" | "after_final_argument"
         "final_instructions_timing": "before_final_argument",
     }
+
+
+def _deduce_party_names_from_text(text: str | None) -> tuple[str | None, str | None]:
+    """Best-effort extraction of (plaintiff, defendant) from narrative case_facts.
+
+    Tries multiple patterns to be robust across examples and filings.
+    """
+    if not text:
+        return None, None
+
+    # 1) Caption-style: ALL CAPS with labels
+    m_p = re.search(r"([A-Z][A-Z '\-\.]+),\s*Plaintiff", text)
+    m_d = re.search(r"([A-Z][A-Z '\-\.]+),\s*Defendant", text)
+    def _titleize(s: str) -> str:
+        return s.title() if s and s.isupper() else s
+    if m_p and m_d:
+        return _titleize(m_p.group(1)), _titleize(m_d.group(1))
+
+    # 2) Narrative: "X filed/brought ... against Y"
+    m = re.search(
+        r"([A-Z][a-z]+(?: [A-Z][a-z]+){0,4})\s+(?:filed|brought)\s+.*?\s+against\s+([A-Z][a-z]+(?: [A-Z][a-z]+){0,4})",
+        text,
+    )
+    if m:
+        return m.group(1), m.group(2)
+
+    # 3) Narrative: "X, ... as plaintiff and Y as defendant" (case-insensitive)
+    m2 = re.search(
+        r"([A-Z][A-Za-z'\-\. ]+?),.*?\bas\s+plaintiff\b.*?\band\s+([A-Z][A-Za-z'\-\. ]+?)\s+\bas\s+defendant\b",
+        text,
+        flags=re.IGNORECASE | re.DOTALL,
+    )
+    if m2:
+        return m2.group(1).strip(), m2.group(2).strip()
+
+    # 4) Parenthetical labels: "X (Plaintiff) ... Y (Defendant)"
+    m3p = re.search(r"([A-Z][A-Za-z'\-\. ]+)\s*\(Plaintiff\)", text, flags=re.IGNORECASE)
+    m3d = re.search(r"([A-Z][A-Za-z'\-\. ]+)\s*\(Defendant\)", text, flags=re.IGNORECASE)
+    if m3p and m3d:
+        return m3p.group(1).strip(), m3d.group(1).strip()
+
+    return None, None
+
+
+def _is_placeholder(s: str | None) -> bool:
+    v = (s or "").strip()
+    return (not v) or (v.startswith("<") and v.endswith(">"))
+
+
+def _mask_placeholder_name(s: str | None) -> str:
+    return "___________" if _is_placeholder(s) else s  # type: ignore[return-value]
 
 
 def call_api_start(  # noqa: PLR0913
@@ -390,7 +442,42 @@ def run(  # noqa: PLR0912, PLR0913, PLR0915
     if not last_status or str(last_status.get("status", "")).upper() != "COMPLETE":
         raise SystemExit("Timed out waiting for job completion. See status_progress.jsonl for details.")
 
-    # 5) Write outputs
+    # 5) Post-process placeholders using case_facts and config, then write outputs
+    case_facts = last_status.get("case_facts")
+    deduced_p, deduced_d = _deduce_party_names_from_text(case_facts)
+    cfg = start_request.get("config") or {}
+    repl = {
+        "<plaintiff name>": deduced_p or cfg.get("plaintiff_name") or "Plaintiff",
+        "<defendant name>": deduced_d or cfg.get("defendant_name") or "Defendant",
+        "<plaintiff attorney>": _mask_placeholder_name(cfg.get("plaintiff_attorney_name")),
+        "<defendant attorney>": _mask_placeholder_name(cfg.get("defendant_attorney_name")),
+    }
+
+    def _replace_placeholders_text(s: str | None) -> str | None:
+        if not isinstance(s, str):
+            return s
+        out = s
+        for k, v in repl.items():
+            out = out.replace(k, v)
+        return out
+
+    # Patch instructions
+    patched_instructions = []
+    for inst in (last_status.get("jury_instructions_text") or []):
+        if isinstance(inst, dict) and "customized_text" in inst:
+            inst = {**inst, "customized_text": _replace_placeholders_text(inst.get("customized_text"))}  # noqa: PLW2901
+        patched_instructions.append(inst)
+    last_status["jury_instructions_text"] = patched_instructions
+
+    # Patch verdict form party names if placeholders present
+    vf = last_status.get("verdict_form") or {}
+    if isinstance(vf, dict):
+        if _is_placeholder(vf.get("plaintiff")):
+            vf["plaintiff"] = repl["<plaintiff name>"]
+        if _is_placeholder(vf.get("defendant")):
+            vf["defendant"] = repl["<defendant name>"]
+        last_status["verdict_form"] = vf
+
     final = {
         "job_id": job_id,
         "status": last_status.get("status"),
@@ -399,6 +486,7 @@ def run(  # noqa: PLR0912, PLR0913, PLR0915
         "claims": last_status.get("claims"),
         "counterclaims": last_status.get("counterclaims"),
         "instructions": last_status.get("jury_instructions_text"),
+        "verdict_form": last_status.get("verdict_form"),
         "source_files": last_status.get("source_files"),
         "createdAt": last_status.get("createdAt"),
         "completedAt": last_status.get("completedAt"),

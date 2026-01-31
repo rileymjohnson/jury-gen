@@ -1,6 +1,7 @@
 import json
 import logging as _logging
 import os
+import re
 
 import boto3
 from boto3.dynamodb.conditions import Attr
@@ -32,6 +33,65 @@ def _scan_all(table, filter_expression=None):
 
 # Cache database claims at cold start (small reference set)
 database_claims = _scan_all(_claims_table)
+
+
+def _llm_extract_party_names(case_facts: str | None) -> tuple[str | None, str | None]:
+    """Use Bedrock to extract (plaintiff, defendant) names from case_facts.
+
+    Returns a tuple of (plaintiff, defendant); either may be None if not found.
+    """
+    text = case_facts or ""
+    if not isinstance(text, str) or not text.strip():
+        return None, None
+
+    tools = [
+        {
+            "name": "extract_party_names",
+            "description": "Extract party names from case summary text.",
+            "input_schema": {
+                "type": "object",
+                "properties": {
+                    "plaintiff": {"type": "string", "description": "Plaintiff's full name as it appears"},
+                    "defendant": {"type": "string", "description": "Defendant's full name as it appears"},
+                },
+                "required": ["plaintiff", "defendant"],
+            },
+        }
+    ]
+
+    prompt = (
+        "Extract the exact full names for the plaintiff and the defendant from the text below.\n"
+        "Return them via the extract_party_names tool. Do not add commentary.\n\n"
+        "TEXT:\n" + text
+    )
+
+    body = json.dumps(
+        {
+            "anthropic_version": "bedrock-2023-05-31",
+            "max_tokens": 300,
+            "tools": tools,
+            "tool_choice": {"type": "tool", "name": "extract_party_names"},
+            "messages": [{"role": "user", "content": prompt}],
+        }
+    )
+
+    try:
+        response = bedrock.invoke_model(
+            body=body,
+            modelId="us.anthropic.claude-sonnet-4-5-20250929-v1:0",
+            accept="application/json",
+            contentType="application/json",
+        )
+        response_body = json.loads(response.get("body").read())
+        for item in response_body.get("content", []):
+            if item.get("type") == "tool_use":
+                inp = item.get("input") or {}
+                p = (inp.get("plaintiff") or "").strip() or None
+                d = (inp.get("defendant") or "").strip() or None
+                return p, d
+    except Exception:
+        pass
+    return None, None
 
 
 def database_get_claim_by_id(claim_id):
@@ -775,24 +835,75 @@ def _pronouns_for(gender: str | None) -> dict:
     return {"subject": "they", "object": "them", "possessive_adj": "their", "reflexive": "themself"}
 
 
-def _generate_201_2(config: dict):
+def _generate_201_2(config: dict, case_facts: str | None = None):  # noqa: PLR0915
     inst = _get_instruction_by_number("201.2")
     if not inst:
         return None
 
+    def _mask_placeholder(val: str | None) -> str:
+        s = str(val or "").strip()
+        # Replace obvious angle-bracket placeholders or empty with a blank line
+        if not s or (s.startswith("<") and s.endswith(">")):
+            return "___________"
+        return s
+
+    # Prefer deduced party names from case_facts if available for 201.2 only
+    def _deduce_party_names(text: str | None) -> tuple[str | None, str | None]:
+        if not text:
+            return None, None
+        p_name = None
+        d_name = None
+        m_p = re.search(r"([A-Z][A-Z '\-\.]+),\s*Plaintiff", text)
+        m_d = re.search(r"([A-Z][A-Z '\-\.]+),\s*Defendant", text)
+        def _titleize(s: str) -> str:
+            return s.title() if s and s.isupper() else s
+        if m_p:
+            p_name = _titleize(m_p.group(1))
+        if m_d:
+            d_name = _titleize(m_d.group(1))
+        if not (p_name and d_name):
+            m = re.search(
+                r"([A-Z][a-z]+(?: [A-Z][a-z]+){0,4})\s+(?:filed|brought)\s+.*?\s+against\s+([A-Z][a-z]+(?: [A-Z][a-z]+){0,4})",  # noqa: E501
+                text,
+            )
+            if m:
+                p_name = p_name or m.group(1)
+                d_name = d_name or m.group(2)
+        if not (p_name and d_name):
+            m2 = re.search(
+                r"([A-Z][A-Za-z'\-\. ]+?),.*?\bas\s+plaintiff\b.*?\band\s+([A-Z][A-Za-z'\-\. ]+?)\s+\bas\s+defendant\b",
+                text,
+                flags=re.IGNORECASE | re.DOTALL,
+            )
+            if m2:
+                p_name = p_name or m2.group(1).strip()
+                d_name = d_name or m2.group(2).strip()
+        if not (p_name and d_name):
+            m3p = re.search(r"([A-Z][A-Za-z'\-\. ]+)\s*\(Plaintiff\)", text, flags=re.IGNORECASE)
+            m3d = re.search(r"([A-Z][A-Za-z'\-\. ]+)\s*\(Defendant\)", text, flags=re.IGNORECASE)
+            if m3p and m3d:
+                p_name = p_name or m3p.group(1).strip()
+                d_name = d_name or m3d.group(1).strip()
+        return p_name, d_name
+
+    # Prefer Bedrock extraction to avoid brittle regex
+    deduced_p, deduced_d = _llm_extract_party_names(case_facts)
+
     inputs = {
         "judge_name": config.get("judge_name"),
-        "plaintiff_name": config.get("plaintiff_name"),
-        "defendant_name": config.get("defendant_name"),
-        "plaintiff_attorney_name": config.get("plaintiff_attorney_name"),
+        # For 201.2, prefer deduced names from case_facts when present
+        "plaintiff_name": deduced_p or config.get("plaintiff_name"),
+        "defendant_name": deduced_d or config.get("defendant_name"),
+        # Attorney placeholders map to a blank line if not provided
+        "plaintiff_attorney_name": _mask_placeholder(config.get("plaintiff_attorney_name")),
         "plaintiff_attorney_pronouns": _pronouns_for(config.get("plaintiff_attorney_gender")),
-        "defendant_attorney_name": config.get("defendant_attorney_name"),
+        "defendant_attorney_name": _mask_placeholder(config.get("defendant_attorney_name")),
         "defendant_attorney_pronouns": _pronouns_for(config.get("defendant_attorney_gender")),
-        "court_clerk_name": config.get("court_clerk_name"),
+        "court_clerk_name": _mask_placeholder(config.get("court_clerk_name")),
         "court_clerk_pronouns": _pronouns_for(config.get("court_clerk_gender")),
-        "court_reporter_name": config.get("court_reporter_name"),
+        "court_reporter_name": _mask_placeholder(config.get("court_reporter_name")),
         "court_reporter_pronouns": _pronouns_for(config.get("court_reporter_gender")),
-        "bailiff_name": config.get("bailiff_name"),
+        "bailiff_name": _mask_placeholder(config.get("bailiff_name")),
         "bailiff_pronouns": _pronouns_for(config.get("bailiff_gender")),
         "plaintiff_is_pro_se": bool(config.get("plaintiff_is_pro_se", False)),
         "defendant_is_pro_se": bool(config.get("defendant_is_pro_se", False)),
@@ -1013,6 +1124,53 @@ def generate_instructions(claims, counterclaims, case_facts, witnesses=None, con
         config = {}
     witnesses = witnesses or []
 
+    # Normalize party names early so downstream instructions receive real names when config has placeholders
+    try:
+        def _norm(s: str) -> str:
+            return str(s or "").strip()
+
+        def _titleize(s: str) -> str:
+            s = _norm(s)
+            return s.title() if s.isupper() else s
+
+        placeholders = {"john doe", "jane doe", "rachel rowe", "plaintiff", "defendant"}
+
+        def _is_ph(s: str) -> bool:
+            s = _norm(s).lower()
+            return (not s) or (s in placeholders)
+
+        p = _norm(config.get("plaintiff_name"))
+        d = _norm(config.get("defendant_name"))
+
+        if _is_ph(p) or _is_ph(d):
+            text = case_facts or ""
+            m_p = re.search(r"([A-Z][A-Z '\-]+),\s*Plaintiff", text)
+            m_d = re.search(r"([A-Z][A-Z '\-]+),\s*Defendant", text)
+            if m_p and _is_ph(p):
+                p = _titleize(m_p.group(1))
+            if m_d and _is_ph(d):
+                d = _titleize(m_d.group(1))
+            if _is_ph(p) or _is_ph(d):
+                m = re.search(
+                    r"([A-Z][a-z]+(?: [A-Z][a-z]+){0,3})\s+(?:filed|brought)\s+.*?\s+against\s+([A-Z][a-z]+(?: [A-Z][a-z]+){0,3})",  # noqa: E501
+                    text,
+                )
+                if m:
+                    if _is_ph(p):
+                        p = _norm(m.group(1))
+                    if _is_ph(d):
+                        d = _norm(m.group(2))
+
+        if not p:
+            p = "Plaintiff"
+        if not d:
+            d = "Defendant"
+
+        config = {**config, "plaintiff_name": p, "defendant_name": d}
+    except Exception:
+        # Best-effort only; keep going on failure
+        pass
+
     all_instructions = []
 
     # 201.1 (pre), 101.1 (if enabled), 201.1 (post)
@@ -1039,7 +1197,7 @@ def generate_instructions(claims, counterclaims, case_facts, witnesses=None, con
 
     # 201.2 Introduction of Participants and Their Roles
     try:
-        inst_201_2 = _generate_201_2(config=config)
+        inst_201_2 = _generate_201_2(config=config, case_facts=case_facts)
         if inst_201_2:
             all_instructions.append(inst_201_2)
     except Exception:
@@ -1160,15 +1318,26 @@ def generate_instructions(claims, counterclaims, case_facts, witnesses=None, con
                     continue
                 db_claim = database_get_claim_by_id(cid) or {}
                 mapping = (db_claim.get("damages") or {}) if isinstance(db_claim, dict) else {}
+                cat = ((mapping.get("claim_category") or db_claim.get("claim_category") or "").lower()
+                       if isinstance(db_claim, dict) else "")
                 _log.info(
                     "5xx-selection(core): cid=%s mapping_keys=%s",
                     cid,
                     list(mapping.keys()) if isinstance(mapping, dict) else type(mapping).__name__,
                 )
                 for n in mapping.get("damages_instructions") or []:
-                    if n:
-                        selected_numbers.add(str(n))
-                        _log.info("5xx-selection(core): add mapping number=%s for cid=%s", n, cid)
+                    if not n:
+                        continue
+                    n_str = str(n)
+                    # Filter out personal-injury 501.x/502.x for non-injury categories
+                    if n_str.startswith("501") and not any(w in cat for w in ("injury", "medical")):
+                        _log.info("5xx-selection(core): skip %s for non-injury category=%s", n_str, cat)
+                        continue
+                    if n_str.startswith("502") and not any(w in cat for w in ("injury", "medical")):
+                        _log.info("5xx-selection(core): skip %s for non-injury category=%s", n_str, cat)
+                        continue
+                    selected_numbers.add(n_str)
+                    _log.info("5xx-selection(core): add mapping number=%s for cid=%s", n_str, cid)
                 if mapping.get("allows_punitive") and bool((info.get("damages") or {}).get("seeks_punitive")):
                     selected_numbers.add("503.1")
                     _log.info("5xx-selection(core): add 503.1 punitive for cid=%s", cid)

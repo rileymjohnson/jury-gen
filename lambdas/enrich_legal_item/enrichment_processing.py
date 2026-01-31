@@ -1,5 +1,6 @@
 import json
 import logging
+import os
 
 import boto3
 
@@ -8,6 +9,10 @@ logger = logging.getLogger()
 logger.setLevel(logging.INFO)
 
 bedrock = boto3.client("bedrock-runtime")
+
+_CLAIMS_TABLE = os.environ.get("DYNAMODB_CLAIMS_TABLE_NAME", "Claims")
+_ddb = boto3.resource("dynamodb")
+_claims_table = _ddb.Table(_CLAIMS_TABLE)
 
 
 def process_defense_window(claim_context: str, previous_context: str, window_text: str) -> dict:
@@ -358,6 +363,153 @@ def extract_raw_defenses_for_claim(claim_context: str, answer_chunks: list[str],
         return deduplicated
 
     return []
+
+
+def _db_get_claim_basic(claim_id: str) -> dict | None:
+    try:
+        if not claim_id:
+            return None
+        res = _claims_table.get_item(Key={"id": claim_id})
+        item = res.get("Item")
+        if item:
+            return {
+                "id": item.get("id"),
+                "title": item.get("title"),
+                "claim_category": ((item.get("damages") or {}).get("claim_category") or item.get("claim_category")),
+            }
+    except Exception:
+        pass
+    return None
+
+
+def classify_defenses(defenses: list[dict], all_claims: list[dict], current_claim_id: str | None = None) -> list[dict]:
+    """Add 'type' and 'applies_to_claims' to each defense via LLM classification.
+
+    If the model fails, default type='complete' and leaves applies_to_claims empty.
+    """
+    if not defenses:
+        return []
+
+    # Build minimal claims list with id, title, and category for context
+    claims_info: list[dict] = []
+    for c in all_claims or []:
+        cid = (c or {}).get("claim_id") or (c or {}).get("id")
+        info = _db_get_claim_basic(cid)
+        if info:
+            claims_info.append(info)
+
+    # Prepare prompt content
+    claims_lines = [
+        f"- {ci.get('id')}: {ci.get('title')} (category: {ci.get('claim_category') or 'unknown'})"
+        for ci in claims_info
+    ]
+    defenses_lines = [
+        f"- name: {d.get('name')}; raw: {d.get('raw_text')}" for d in (defenses or [])
+    ]
+
+    tools = [
+        {
+            "name": "classify_defenses",
+            "description": "Classify defenses and map to applicable claim IDs",
+            "input_schema": {
+                "type": "object",
+                "properties": {
+                    "classified": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "name": {"type": "string"},
+                                "raw_text": {"type": "string"},
+                                "type": {
+                                    "type": "string",
+                                    "enum": ["complete", "setoff", "apportionment", "partial"],
+                                },
+                                "applies_to_claims": {
+                                    "type": "array",
+                                    "items": {"type": "string"},
+                                },
+                            },
+                            "required": ["name", "raw_text", "type", "applies_to_claims"],
+                        },
+                    }
+                },
+                "required": ["classified"],
+            },
+        }
+    ]
+
+    guidelines = (
+        "Type classification: 'complete' bars recovery entirely if proven (default/most common); "
+        "'setoff' reduces damages by a dollar amount (e.g., Setoff, Recoupment, Prior Payment); "
+        "'apportionment' requires fault percentage allocation (Comparative Fault/Negligence); "
+        "'partial' reduces damages without barring recovery (e.g., Failure to Mitigate, Pre‑Existing Condition).\n\n"  # noqa: RUF001
+        "Map applies_to_claims to the specific claim IDs listed below based on legal fit (e.g., Truth → defamation only; "  # noqa: E501
+        "Unclean Hands → contract/equity; Comparative Fault → negligence/tort)."
+    )
+
+    body = json.dumps(
+        {
+            "anthropic_version": "bedrock-2023-05-31",
+            "max_tokens": 1500,
+            "tools": tools,
+            "tool_choice": {"type": "tool", "name": "classify_defenses"},
+            "messages": [
+                {
+                    "role": "user",
+                    "content": (
+                        "You are classifying affirmative defenses for verdict form logic.\n\n"
+                        + "CLAIMS PRESENT (id: title [category]):\n"
+                        + "\n".join(claims_lines or ["(none provided)"])
+                        + "\n\nDEFENSES TO CLASSIFY (name; raw):\n"
+                        + "\n".join(defenses_lines)
+                        + "\n\n"
+                        + guidelines
+                        + "\nReturn a classified list with type and applies_to_claims (ids)."
+                    ),
+                }
+            ],
+        }
+    )
+
+    try:
+        response = bedrock.invoke_model(
+            body=body,
+            modelId="us.anthropic.claude-sonnet-4-5-20250929-v1:0",
+            accept="application/json",
+            contentType="application/json",
+        )
+        response_body = json.loads(response.get("body").read())
+        for item in response_body.get("content", []):
+            if item.get("type") == "tool_use":
+                classified = item["input"].get("classified") or []
+                # Ensure minimal defaults
+                out: list[dict] = []
+                for d in classified:
+                    name = (d or {}).get("name") or ""
+                    raw = (d or {}).get("raw_text") or ""
+                    typ = (d or {}).get("type") or "complete"
+                    applies = (d or {}).get("applies_to_claims") or []
+                    out.append({
+                        "name": name,
+                        "raw_text": raw,
+                        "type": typ,
+                        "applies_to_claims": applies,
+                    })
+                if out:
+                    return out
+    except Exception:
+        pass
+
+    # Fallback: default everything to complete, with no applies_to_claims mapping
+    fallback: list[dict] = [{
+        "name": d.get("name"),
+        "raw_text": d.get("raw_text"),
+        "type": "complete",
+        "applies_to_claims": [],
+    } for d in defenses]
+
+    return fallback
 
 
 def extract_damages_for_claim(

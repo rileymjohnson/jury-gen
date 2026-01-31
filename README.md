@@ -118,3 +118,15 @@ See Lambda definitions and environment variables in `terraform/lambda.tf:1`.
   - UI: `scripts/ui_app.py` (Streamlit) to browse inputs, run, and view live logs.
 
 More details and a diagram are available in `docs/WORKFLOW.md`.
+
+## Config Placeholders and Name Resolution
+
+- The helper runners (`scripts/run_api.py`, `scripts/run_lambda_local.py`, and `scripts/ui_app.py`) ship with placeholder values in their default config (e.g., `<plaintiff name>`, `<defendant attorney>`, `<incident date>`, `<incident location>`). These are meant to be obvious stand‑ins so you remember to supply case‑specific details.
+
+- Party names: If the config contains placeholders or generic values (e.g., "Plaintiff", "Defendant", "John Doe", "Rachel Rowe"), the instruction aggregator attempts to extract real names from `case_facts` using common caption and narrative patterns. The extracted names then flow into all instructions and the verdict form. If extraction fails, the system falls back to the config values (or ultimately to "Plaintiff"/"Defendant").
+
+- Counsel and staff names: If omitted or left as placeholders, the 201.2 renderer uses whatever is provided. There is no automatic extraction for attorney/clerk/reporter/bailiff names. Pronouns default to neutral when a `*_gender` is not provided.
+
+- Dates and locations: The defaults are placeholders (`<incident date>`, `<incident location>`). There is no automatic extraction for these today; set them in config if you want them reflected verbatim where the templates call for them.
+
+- DOCX export: The verdict form includes a centered caption with the extracted party names and a foreperson signature block. Question numbering is preserved, including damages and punitive questions.

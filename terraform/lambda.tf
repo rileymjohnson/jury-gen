@@ -195,6 +195,12 @@ resource "aws_lambda_function" "enrich_legal_item" {
   filename         = data.archive_file.enrich_legal_item.output_path
   source_code_hash = data.archive_file.enrich_legal_item.output_base64sha256
   timeout          = 600
+
+  environment {
+    variables = {
+      DYNAMODB_CLAIMS_TABLE_NAME = aws_dynamodb_table.claims.name
+    }
+  }
 }
 
 resource "aws_lambda_function" "generate_instructions" {
