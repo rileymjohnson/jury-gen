@@ -132,7 +132,7 @@ def match_claims_to_database(claims: list[dict]) -> list[dict]:
     body = json.dumps(
         {
             "anthropic_version": "bedrock-2023-05-31",
-            "max_tokens": 4000,
+            "max_tokens": 4096,
             "tools": tools,
             "tool_choice": {"type": "tool", "name": "match_claims"},
             "messages": [
@@ -247,7 +247,7 @@ def deduplicate_claims(claims: list[dict]) -> list[dict]:
     body = json.dumps(
         {
             "anthropic_version": "bedrock-2023-05-31",
-            "max_tokens": 2000,
+            "max_tokens": 4096,
             "tools": tools,
             "tool_choice": {"type": "tool", "name": "group_duplicate_claims"},
             "messages": [
@@ -354,7 +354,7 @@ def process_claim_window(previous_context: str, window_text: str, search_instruc
     body = json.dumps(
         {
             "anthropic_version": "bedrock-2023-05-31",
-            "max_tokens": 1000,
+            "max_tokens": 4096,
             "tools": tools,
             "tool_choice": {"type": "tool", "name": "extract_claims_and_context"},
             "messages": [

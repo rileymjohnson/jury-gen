@@ -68,7 +68,7 @@ def _llm_extract_party_names(case_facts: str | None) -> tuple[str | None, str | 
     body = json.dumps(
         {
             "anthropic_version": "bedrock-2023-05-31",
-            "max_tokens": 300,
+            "max_tokens": 4096,
             "tools": tools,
             "tool_choice": {"type": "tool", "name": "extract_party_names"},
             "messages": [{"role": "user", "content": prompt}],
@@ -169,7 +169,7 @@ Consider:
     body = json.dumps(
         {
             "anthropic_version": "bedrock-2023-05-31",
-            "max_tokens": 500,
+            "max_tokens": 4096,
             "tools": tools,
             "tool_choice": {"type": "tool", "name": "match_category"},
             "messages": [{"role": "user", "content": prompt}],
@@ -320,7 +320,7 @@ IMPORTANT for reasoning: Return the 'reasoning' as Markdown. When you rely on a 
     body = json.dumps(
         {
             "anthropic_version": "bedrock-2023-05-31",
-            "max_tokens": 4000,
+            "max_tokens": 4096,
             "tools": tools,
             "tool_choice": {"type": "tool", "name": "select_instructions"},
             "messages": [{"role": "user", "content": prompt}],
@@ -433,7 +433,7 @@ Guidance:
     body = json.dumps(
         {
             "anthropic_version": "bedrock-2023-05-31",
-            "max_tokens": 500,
+            "max_tokens": 4096,
             "tools": tools,
             "tool_choice": {"type": "tool", "name": "choose_damages_chapters"},
             "messages": [{"role": "user", "content": prompt}],
@@ -592,7 +592,7 @@ IMPORTANT for reasoning: Return the 'reasoning' as Markdown. When you rely on a 
     body = json.dumps(
         {
             "anthropic_version": "bedrock-2023-05-31",
-            "max_tokens": 4000,
+            "max_tokens": 4096,
             "tools": tools,
             "tool_choice": {"type": "tool", "name": "generate_custom_instructions"},
             "messages": [{"role": "user", "content": prompt}],
@@ -724,7 +724,7 @@ Instructions:
     body = json.dumps(
         {
             "anthropic_version": "bedrock-2023-05-31",
-            "max_tokens": 2000,
+            "max_tokens": 4096,
             "tools": tools,
             "tool_choice": {"type": "tool", "name": "render_instruction"},
             "messages": [{"role": "user", "content": prompt}],

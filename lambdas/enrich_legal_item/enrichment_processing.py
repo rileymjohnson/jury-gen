@@ -54,7 +54,7 @@ def process_defense_window(claim_context: str, previous_context: str, window_tex
     body = json.dumps(
         {
             "anthropic_version": "bedrock-2023-05-31",
-            "max_tokens": 1000,
+            "max_tokens": 4096,
             "tools": tools,
             "tool_choice": {"type": "tool", "name": "extract_defenses_and_context"},
             "messages": [
@@ -161,7 +161,7 @@ def process_damages_window(claim_context: str, previous_context: str, window_tex
     body = json.dumps(
         {
             "anthropic_version": "bedrock-2023-05-31",
-            "max_tokens": 1500,
+            "max_tokens": 4096,
             "tools": tools,
             "tool_choice": {"type": "tool", "name": "extract_damages_and_context"},
             "messages": [
@@ -290,7 +290,7 @@ def deduplicate_defenses(defenses: list[dict]) -> list[dict]:
     body = json.dumps(
         {
             "anthropic_version": "bedrock-2023-05-31",
-            "max_tokens": 2000,
+            "max_tokens": 4096,
             "tools": tools,
             "tool_choice": {"type": "tool", "name": "group_duplicate_defenses"},
             "messages": [
@@ -459,7 +459,7 @@ def classify_defenses(defenses: list[dict], all_claims: list[dict], current_clai
     body = json.dumps(
         {
             "anthropic_version": "bedrock-2023-05-31",
-            "max_tokens": 1500,
+            "max_tokens": 4096,
             "tools": tools,
             "tool_choice": {"type": "tool", "name": "classify_defenses"},
             "messages": [

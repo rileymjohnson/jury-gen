@@ -48,7 +48,7 @@ def extract_witnesses(witness_list_chunks: list[str]) -> list[dict]:
     body = json.dumps(
         {
             "anthropic_version": "bedrock-2023-05-31",
-            "max_tokens": 2000,
+            "max_tokens": 4096,
             "tools": tools,
             "tool_choice": {"type": "tool", "name": "extract_witness_names"},
             "messages": [
