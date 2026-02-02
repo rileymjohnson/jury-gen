@@ -69,7 +69,7 @@ NEW CONTENT from {source}:
     body = json.dumps(
         {
             "anthropic_version": "bedrock-2023-05-31",
-            "max_tokens": 1500,
+            "max_tokens": 4096,
             "tools": tools,
             "tool_choice": {"type": "tool", "name": "update_facts"},
             "messages": [{"role": "user", "content": prompt}],
@@ -88,7 +88,10 @@ NEW CONTENT from {source}:
     # Extract tool use result
     for item in response_body.get("content", []):
         if item.get("type") == "tool_use":
-            return item["input"]["updated_facts"]
+            updated = item.get("input", {}).get("updated_facts")
+
+            if updated:
+                return updated
 
     # Fallback if no tool use found
     return current_facts
